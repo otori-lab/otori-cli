@@ -1,7 +1,7 @@
-package main;
+package main
 
-import "fmt";
+import "github.com/otori-lab/otori-cli/internal/commands"
 
-func main(){
-	fmt.Println("OTORI CLI - INIT");
+func main() {
+	commands.RootCmd.Execute()
 }
