@@ -1,0 +1,45 @@
+# ===== Go =====
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Build artifacts
+*.out
+*.test
+
+# Go workspace / modules
+/go.work
+/go.work.sum
+
+# ===== OS / Editor =====
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ===== Logs / Runtime =====
+logs/
+*.log
+
+# ===== Environment / Config =====
+.env
+.env.local
+config.local.yaml
+config.local.yml
+
+# ===== Docker =====
+docker-data/
+volumes/
+
+# ===== Temporary files =====
+tmp/
+temp/
+
