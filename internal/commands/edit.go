@@ -8,68 +8,78 @@ import (
 	"github.com/otori-lab/otori-cli/internal/tui"
 )
 
-// EditCommand ouvre un profil existant pour édition
+// EditCommand opens an existing profile for editing
 func EditCommand(profileName string) error {
 	if profileName == "" {
-		return fmt.Errorf("veuillez spécifier le nom du profil à éditer")
+		return fmt.Errorf("please specify the profile name to edit")
 	}
 
-	// Charger la configuration existante
+	// Load existing configuration
 	cfg, err := config.ReadConfig(profileName)
 	if err != nil {
-		return fmt.Errorf("profil '%s' non trouvé: %w", profileName, err)
+		return fmt.Errorf("profile '%s' not found: %w", profileName, err)
 	}
 
-	// Créer le modèle de formulaire pré-rempli avec les données existantes
+	// Create form model pre-filled with existing data
 	model := tui.NewModelWithConfig(cfg)
 
-	// Lancer le programme TUI
+	// Launch TUI program
 	p := tea.NewProgram(model, tea.WithAltScreen())
 	finalModel, err := p.Run()
 	if err != nil {
-		return fmt.Errorf("erreur TUI: %w", err)
+		return fmt.Errorf("TUI error: %w", err)
 	}
 
-	// Récupérer le modèle final
+	// Get final model
 	m := finalModel.(tui.Model)
 
-	// Si l'utilisateur a annulé
+	// If user cancelled
 	if m.IsCancelled() {
-		fmt.Println("❌ Édition annulée")
+		fmt.Println("Edit cancelled")
 		return nil
 	}
 
-	// Obtenir la configuration finale
+	// Get final configuration
 	finalConfig := m.GetConfig()
-	finalConfig.CreatedAt = cfg.CreatedAt // Préserver la date de création
+	finalConfig.CreatedAt = cfg.CreatedAt // Preserve creation date
 
-	// Préserver le nom du profil si l'utilisateur veut le garder
+	// Preserve profile name if user wants to keep it
 	if finalConfig.ProfileName == "" {
 		finalConfig.ProfileName = profileName
 	}
 
-	// Afficher un aperçu avant confirmation
+	// Show preview before confirmation
 	previewModel := tui.NewPreviewModel(finalConfig)
 	p = tea.NewProgram(previewModel, tea.WithAltScreen())
 
 	finalPreview, err := p.Run()
 	if err != nil {
-		return fmt.Errorf("erreur aperçu: %w", err)
+		return fmt.Errorf("preview error: %w", err)
 	}
 
 	preview := finalPreview.(tui.PreviewModel)
 
-	// Si l'utilisateur a refusé
+	// If user declined
 	if !preview.IsConfirmed() || preview.IsCancelled() {
-		fmt.Println("\n❌ Édition annulée")
+		fmt.Println("\nEdit cancelled")
 		return nil
 	}
 
-	// Écrire la configuration modifiée
-	if err := config.WriteConfigWithName(profileName, finalConfig); err != nil {
-		return fmt.Errorf("erreur sauvegarde: %w", err)
+	// Validate configuration before saving
+	validationErrors := config.ValidateConfig(finalConfig)
+	if len(validationErrors) > 0 {
+		fmt.Println("Validation errors:")
+		for _, err := range validationErrors {
+			fmt.Printf("  - %s: %s\n", err.Field, err.Message)
+		}
+		return fmt.Errorf("configuration validation failed")
 	}
 
-	fmt.Printf("✓ Profil '%s' modifié avec succès\n", profileName)
+	// Write modified configuration
+	if err := config.WriteConfigWithName(profileName, finalConfig); err != nil {
+		return fmt.Errorf("save error: %w", err)
+	}
+
+	fmt.Printf("✓ Profile '%s' updated successfully\n", profileName)
 	return nil
 }

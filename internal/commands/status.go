@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 
+	"github.com/otori-lab/otori-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -13,6 +14,7 @@ var statusCmd = &cobra.Command{
 	Use:   "status",
 	Short: "Display status of honeypots",
 	Run: func(cmd *cobra.Command, args []string) {
+		fmt.Println(ui.GetLogo())
 		fmt.Println("Display status of honeypots")
 
 		if statusProfile != "" {

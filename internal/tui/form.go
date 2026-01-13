@@ -6,11 +6,12 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/otori-lab/otori-cli/internal/config"
 	"github.com/otori-lab/otori-cli/internal/models"
 	"github.com/otori-lab/otori-cli/internal/ui"
 )
 
-// FieldType représente le type de champ
+// FieldType represents a field type
 type FieldType string
 
 const (
@@ -19,7 +20,7 @@ const (
 	FieldTypeList   FieldType = "list"
 )
 
-// Model représente l'état du formulaire TUI
+// Model represents the TUI form state
 type Model struct {
 	config       *models.Config
 	currentField int
@@ -28,14 +29,14 @@ type Model struct {
 	cancelled    bool
 	err          string
 
-	// Pour les sélecteurs
+	// For selectors
 	selectIndex map[string]int
-	// Pour les listes
+	// For lists
 	listInput string
 	listUsers []string
 }
 
-// Field représente un champ du formulaire
+// Field represents a form field
 type Field struct {
 	name        string
 	label       string
@@ -43,22 +44,22 @@ type Field struct {
 	placeholder string
 	required    bool
 	fieldType   FieldType
-	options     []string // pour les sélecteurs
+	options     []string // for selectors
 }
 
-// NewModel crée un nouveau modèle de formulaire
+// NewModel creates a new form model
 func NewModel() Model {
 	return createModel("", nil)
 }
 
-// NewModelWithConfig crée un nouveau modèle de formulaire pré-rempli avec une configuration existante
+// NewModelWithConfig creates a new form model pre-filled with an existing configuration
 func NewModelWithConfig(cfg *models.Config) Model {
 	return createModel("edit", cfg)
 }
 
-// createModel est une fonction interne pour créer le modèle
+// createModel is an internal function to create the model
 func createModel(mode string, cfg *models.Config) Model {
-	// Initialiser avec des valeurs par défaut
+	// Initialize with default values
 	typeValue := "classic"
 	serverValue := ""
 	profileValue := ""
@@ -66,7 +67,7 @@ func createModel(mode string, cfg *models.Config) Model {
 	var usersList []string
 	selectTypeIndex := 0
 
-	// Si on édite une config existante, pré-remplir les champs
+	// If editing an existing config, pre-fill fields
 	if cfg != nil {
 		typeValue = cfg.Type
 		serverValue = cfg.ServerName
@@ -74,7 +75,7 @@ func createModel(mode string, cfg *models.Config) Model {
 		companyValue = cfg.Company
 		usersList = cfg.Users
 
-		// Trouver l'index du type sélectionné (normaliser en lowercase)
+		// Find the selected type index (normalize to lowercase)
 		if strings.ToLower(typeValue) == "ia" {
 			selectTypeIndex = 1
 		}
@@ -85,7 +86,7 @@ func createModel(mode string, cfg *models.Config) Model {
 		fields: []Field{
 			{
 				name:      "type",
-				label:     "Type de profil",
+				label:     "Profile type",
 				required:  true,
 				fieldType: FieldTypeSelect,
 				options:   []string{"classic", "ia"},
@@ -93,30 +94,30 @@ func createModel(mode string, cfg *models.Config) Model {
 			},
 			{
 				name:        "serverName",
-				label:       "Nom du serveur",
-				placeholder: "ex: mon-serveur",
+				label:       "Server name",
+				placeholder: "e.g. my-server",
 				required:    true,
 				fieldType:   FieldTypeText,
 				value:       serverValue,
 			},
 			{
 				name:        "profileName",
-				label:       "Nom du profil",
-				placeholder: "default si vide",
+				label:       "Profile name",
+				placeholder: "default if empty",
 				fieldType:   FieldTypeText,
 				value:       profileValue,
 			},
 			{
 				name:        "company",
-				label:       "Entreprise",
-				placeholder: "optionnel",
+				label:       "Company",
+				placeholder: "optional",
 				fieldType:   FieldTypeText,
 				value:       companyValue,
 			},
 			{
 				name:        "users",
-				label:       "Utilisateurs",
-				placeholder: "un nom par ligne (Enter pour ajouter, Ctrl+D pour terminer)",
+				label:       "Users",
+				placeholder: "one per line (Enter to add, Ctrl+D to finish)",
 				fieldType:   FieldTypeList,
 			},
 		},
@@ -128,12 +129,12 @@ func createModel(mode string, cfg *models.Config) Model {
 	return model
 }
 
-// Init initialise le modèle
+// Init initializes the model
 func (m Model) Init() tea.Cmd {
 	return nil
 }
 
-// Update gère les mises à jour du modèle
+// Update handles model updates
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -143,7 +144,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 
 		case "ctrl+d":
-			// Pour les listes: terminer la saisie
+			// For lists: finish input
 			if m.fields[m.currentField].fieldType == FieldTypeList {
 				if m.listInput != "" {
 					cleaned := strings.TrimSpace(m.listInput)
@@ -153,11 +154,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.listInput = ""
 				}
-				// Passer au champ suivant
+				// Move to next field or finish
 				if m.currentField < len(m.fields)-1 {
 					m.currentField++
 					m.listInput = ""
-					m.listUsers = []string{}
 				} else {
 					m.finished = true
 					return m, tea.Quit
@@ -167,10 +167,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "enter":
 			field := &m.fields[m.currentField]
 
-			// Gestion selon le type de champ
+			// Handle based on field type
 			switch field.fieldType {
 			case FieldTypeSelect:
-				// Sélecteur: valider et passer au suivant
+				// Selector: validate and move to next
 				if m.validateCurrentField() {
 					m.err = ""
 					if m.currentField < len(m.fields)-1 {
@@ -182,7 +182,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 
 			case FieldTypeList:
-				// Liste: ajouter l'utilisateur et continuer
+				// List: add user and continue
 				if m.listInput != "" {
 					cleaned := strings.TrimSpace(m.listInput)
 					cleaned = strings.Trim(cleaned, "\x00")
@@ -191,21 +191,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 					m.listInput = ""
 				} else {
-					// Si vide et on a des utilisateurs, passer au suivant
-					if len(m.listUsers) > 0 {
-						if m.currentField < len(m.fields)-1 {
-							m.currentField++
-							m.listInput = ""
-							m.listUsers = []string{}
-						} else {
-							m.finished = true
-							return m, tea.Quit
-						}
+					// If empty, finish the list and move to next field
+					if m.currentField < len(m.fields)-1 {
+						m.currentField++
+						m.listInput = ""
+					} else {
+						m.finished = true
+						return m, tea.Quit
 					}
 				}
 
 			case FieldTypeText:
-				// Texte: valider et passer au suivant
+				// Text: validate and move to next
 				if m.validateCurrentField() {
 					m.err = ""
 					if m.currentField < len(m.fields)-1 {
@@ -220,7 +217,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "up":
 			field := &m.fields[m.currentField]
 			if field.fieldType == FieldTypeSelect {
-				// Naviguer dans le sélecteur
+				// Navigate in selector
 				idx := m.selectIndex[field.name]
 				if idx > 0 {
 					idx--
@@ -230,14 +227,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if m.currentField > 0 {
 				m.currentField--
 				m.listInput = ""
-				m.listUsers = []string{}
 				m.err = ""
 			}
 
 		case "down":
 			field := &m.fields[m.currentField]
 			if field.fieldType == FieldTypeSelect {
-				// Naviguer dans le sélecteur
+				// Navigate in selector
 				idx := m.selectIndex[field.name]
 				if idx < len(field.options)-1 {
 					idx++
@@ -247,7 +243,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else if m.currentField < len(m.fields)-1 {
 				m.currentField++
 				m.listInput = ""
-				m.listUsers = []string{}
 				m.err = ""
 			}
 
@@ -279,7 +274,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// View renvoie la vue du formulaire
+// View returns the form view
 func (m Model) View() string {
 	if m.finished {
 		return ""
@@ -287,11 +282,11 @@ func (m Model) View() string {
 
 	var sb strings.Builder
 
-	// Afficher le logo au-dessus
+	// Display logo
 	sb.WriteString(ui.GetLogo())
 	sb.WriteString("\n")
 
-	// Afficher les infos du projet
+	// Display project info
 	sb.WriteString(ui.GetProjectInfo())
 	sb.WriteString("\n")
 	sb.WriteString("\n")
@@ -330,14 +325,14 @@ func (m Model) View() string {
 	errorStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("196"))
 
-	// Titre du questionnaire
+	// Form title
 	sb.WriteString(titleStyle.Render("Configuration"))
 	sb.WriteString("\n\n")
 
-	// Afficher chaque champ
+	// Display each field
 	for i, field := range m.fields {
 		if i == m.currentField {
-			// Champ actuel en édition
+			// Current field being edited
 			label := activeStyle.Render("➜ " + field.label)
 			if field.required {
 				label += activeStyle.Render(" *")
@@ -345,9 +340,9 @@ func (m Model) View() string {
 			sb.WriteString(label)
 			sb.WriteString("\n")
 
-			// Afficher selon le type de champ
+			// Display based on field type
 			if field.fieldType == FieldTypeSelect {
-				// Sélecteur
+				// Selector
 				for j, option := range field.options {
 					if j == m.selectIndex[field.name] {
 						sb.WriteString(selectActiveStyle.Render(" ● " + option + " "))
@@ -359,13 +354,13 @@ func (m Model) View() string {
 				sb.WriteString("\n")
 
 			} else if field.fieldType == FieldTypeList {
-				// Liste d'utilisateurs
+				// User list
 				if len(m.listUsers) > 0 {
 					for _, user := range m.listUsers {
 						sb.WriteString(completeStyle.Render("  ✓ " + user + "\n"))
 					}
 				}
-				// Input actuel
+				// Current input
 				if m.listInput == "" {
 					sb.WriteString(inputStyle.Render(placeholderStyle.Render("▌ " + field.placeholder)))
 				} else {
@@ -374,7 +369,7 @@ func (m Model) View() string {
 				sb.WriteString("\n")
 
 			} else {
-				// Champ texte
+				// Text field
 				if field.value == "" {
 					sb.WriteString(inputStyle.Render(placeholderStyle.Render(field.placeholder + " ▌")))
 				} else {
@@ -383,14 +378,14 @@ func (m Model) View() string {
 				sb.WriteString("\n")
 			}
 
-			// Afficher les erreurs
+			// Display errors
 			if m.err != "" {
 				sb.WriteString(errorStyle.Render("✗ " + m.err))
 				sb.WriteString("\n")
 			}
 
 		} else {
-			// Champs précédents ou suivants
+			// Previous or next fields
 			label := "  " + field.label
 			if field.required {
 				label += " *"
@@ -398,7 +393,7 @@ func (m Model) View() string {
 			sb.WriteString(labelStyle.Render(label))
 			sb.WriteString("\n")
 
-			// Afficher l'état du champ
+			// Display field state
 			if field.fieldType == FieldTypeSelect {
 				sb.WriteString(completeStyle.Render("    ✓ " + field.value + "\n"))
 
@@ -429,39 +424,39 @@ func (m Model) View() string {
 
 	fieldType := m.fields[m.currentField].fieldType
 	if fieldType == FieldTypeSelect {
-		sb.WriteString(instructionsStyle.Render("↑↓ Choisir | Enter Valider | Ctrl+C Quitter"))
+		sb.WriteString(instructionsStyle.Render("↑↓ Select | Enter Confirm | Ctrl+C Quit"))
 	} else if fieldType == FieldTypeList {
-		sb.WriteString(instructionsStyle.Render("Enter Ajouter | Ctrl+D Terminer | Ctrl+C Quitter"))
+		sb.WriteString(instructionsStyle.Render("Enter Add | Ctrl+D Finish | Ctrl+C Quit"))
 	} else {
-		sb.WriteString(instructionsStyle.Render("↑↓ Naviguer | Enter Valider | Ctrl+C Quitter"))
+		sb.WriteString(instructionsStyle.Render("↑↓ Navigate | Enter Confirm | Ctrl+C Quit"))
 	}
 	sb.WriteString("\n")
 
 	return sb.String()
 }
 
-// validateCurrentField valide le champ actuel
+// validateCurrentField validates the current field
 func (m *Model) validateCurrentField() bool {
 	field := &m.fields[m.currentField]
 	value := strings.TrimSpace(field.value)
 	field.value = value
 
 	if field.required && value == "" {
-		m.err = fmt.Sprintf("%s est obligatoire", field.label)
+		m.err = fmt.Sprintf("%s is required", field.label)
 		return false
 	}
 
-	// Validations spécifiques selon le champ
+	// Field-specific validations
 	switch field.name {
 	case "serverName":
 		if len(value) < 3 {
-			m.err = "Le serveur doit avoir au moins 3 caractères"
+			m.err = "Server name must be at least 3 characters"
 			return false
 		}
 
 	case "profileName":
-		if len(value) > 0 && !isValidProfileName(value) {
-			m.err = "Utilisez seulement des lettres, chiffres, tirets et underscores"
+		if len(value) > 0 && !config.IsValidProfileName(value) {
+			m.err = "Use only letters, numbers, hyphens and underscores"
 			return false
 		}
 	}
@@ -469,75 +464,58 @@ func (m *Model) validateCurrentField() bool {
 	return true
 }
 
-// isValidProfileName vérifie si un nom de profil est valide
-func isValidProfileName(name string) bool {
-	if name == "" || len(name) > 100 {
-		return false
-	}
-
-	for _, ch := range name {
-		if !((ch >= 'a' && ch <= 'z') ||
-			(ch >= 'A' && ch <= 'Z') ||
-			(ch >= '0' && ch <= '9') ||
-			ch == '-' || ch == '_') {
-			return false
-		}
-	}
-	return true
-}
-
-// cleanUser nettoie une entrée utilisateur
+// cleanUser cleans a user entry
 func cleanUser(user string) string {
 	cleaned := strings.TrimSpace(user)
 
-	// Enlever tous les caractères nuls et de contrôle
+	// Remove all null and control characters
 	var result strings.Builder
 	for _, r := range cleaned {
-		if r >= 32 && r != 127 { // Garder seulement les caractères imprimables
+		if r >= 32 && r != 127 { // Keep only printable characters
 			result.WriteRune(r)
 		}
 	}
 
-	return strings.TrimSpace(result.String())
+	return result.String()
 }
 
-// GetConfig retourne la configuration remplie
+// GetConfig returns the filled configuration
 func (m Model) GetConfig() *models.Config {
-	config := models.NewConfig()
+	cfg := models.NewConfig()
 
 	for _, field := range m.fields {
 		switch field.name {
 		case "type":
-			config.Type = field.value
+			cfg.Type = field.value
 		case "serverName":
-			config.ServerName = field.value
+			cfg.ServerName = field.value
 		case "profileName":
-			config.ProfileName = field.value
-			if config.ProfileName == "" {
-				config.ProfileName = "default"
+			cfg.ProfileName = field.value
+			if cfg.ProfileName == "" {
+				cfg.ProfileName = "default"
 			}
 		case "company":
-			config.Company = field.value
+			cfg.Company = field.value
 		case "users":
-			// Nettoyer et ajouter les utilisateurs (sans caractères nuls ou vides)
+			// Clean and add users (without null or empty characters)
 			for _, user := range m.listUsers {
 				cleaned := cleanUser(user)
 				if cleaned != "" {
-					config.Users = append(config.Users, cleaned)
+					cfg.Users = append(cfg.Users, cleaned)
 				}
 			}
 		}
 	}
 
-	return config
+	return cfg
 }
 
-// IsFinished retourne true si le formulaire est terminé
+// IsFinished returns true if the form is finished
 func (m Model) IsFinished() bool {
 	return m.finished
 }
 
-// IsCancelled retourne true si l'utilisateur a annulé
+// IsCancelled returns true if the user cancelled
 func (m Model) IsCancelled() bool {
 	return m.cancelled
 }
