@@ -1,0 +1,13 @@
+{
+  "type": "IA",
+  "serverName": "pas",
+  "profileName": "default",
+  "company": "ece",
+  "users": [
+    "jn",
+    "paul",
+    "mathis",
+    "\u0000"
+  ],
+  "createdAt": "2026-01-13T12:38:48+01:00"
+}

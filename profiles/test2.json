@@ -1,0 +1,11 @@
+{
+  "type": "classique",
+  "serverName": "test2",
+  "profileName": "test2",
+  "company": "",
+  "users": [
+    "jn",
+    "paul"
+  ],
+  "createdAt": "2026-01-13T12:41:45+01:00"
+}
