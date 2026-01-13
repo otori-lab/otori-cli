@@ -43,3 +43,7 @@ volumes/
 tmp/
 temp/
 
+# ===== Local data =====
+profiles/
+exports/
+
