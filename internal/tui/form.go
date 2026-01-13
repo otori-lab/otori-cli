@@ -59,7 +59,7 @@ func NewModelWithConfig(cfg *models.Config) Model {
 // createModel est une fonction interne pour créer le modèle
 func createModel(mode string, cfg *models.Config) Model {
 	// Initialiser avec des valeurs par défaut
-	typeValue := "classique"
+	typeValue := "classic"
 	serverValue := ""
 	profileValue := ""
 	companyValue := ""
@@ -74,8 +74,8 @@ func createModel(mode string, cfg *models.Config) Model {
 		companyValue = cfg.Company
 		usersList = cfg.Users
 
-		// Trouver l'index du type sélectionné
-		if typeValue == "IA" {
+		// Trouver l'index du type sélectionné (normaliser en lowercase)
+		if strings.ToLower(typeValue) == "ia" {
 			selectTypeIndex = 1
 		}
 	}
@@ -88,7 +88,7 @@ func createModel(mode string, cfg *models.Config) Model {
 				label:     "Type de profil",
 				required:  true,
 				fieldType: FieldTypeSelect,
-				options:   []string{"classique", "IA"},
+				options:   []string{"classic", "ia"},
 				value:     typeValue,
 			},
 			{
