@@ -5,15 +5,18 @@ import (
 	"strings"
 
 	"github.com/otori-lab/otori-cli/internal/config"
+	"github.com/otori-lab/otori-cli/internal/ui"
 )
 
-// ExportCommand exporte un profil
+// ExportCommand exports a profile
 func ExportCommand(profileName, outputPath, format string) error {
+	fmt.Println(ui.GetLogo())
+
 	if profileName == "" {
-		return fmt.Errorf("veuillez spécifier le profil à exporter")
+		return fmt.Errorf("please specify the profile to export")
 	}
 
-	// Normaliser le format
+	// Normalize format
 	format = strings.ToLower(format)
 	if format == "" {
 		format = "yaml"
@@ -28,7 +31,7 @@ func ExportCommand(profileName, outputPath, format string) error {
 	case "json":
 		exportFormat = config.FormatJSON
 	default:
-		return fmt.Errorf("format non supporté: %s (utiliser: yaml, csv)", format)
+		return fmt.Errorf("unsupported format: %s (use: yaml, csv)", format)
 	}
 
 	if err := config.ExportConfig(profileName, exportFormat, outputPath); err != nil {
@@ -39,17 +42,19 @@ func ExportCommand(profileName, outputPath, format string) error {
 		outputPath = "exports/" + profileName + "." + format
 	}
 
-	fmt.Printf("✓ Profil '%s' exporté vers %s\n", profileName, outputPath)
+	fmt.Printf("✓ Profile '%s' exported to %s\n", profileName, outputPath)
 	return nil
 }
 
-// ImportCommand importe une configuration
+// ImportCommand imports a configuration
 func ImportCommand(filePath, profileName string) error {
+	fmt.Println(ui.GetLogo())
+
 	if filePath == "" {
-		return fmt.Errorf("veuillez spécifier le chemin du fichier à importer")
+		return fmt.Errorf("please specify the file path to import")
 	}
 
-	// Déterminer le format à partir de l'extension
+	// Determine format from extension
 	var ext string
 	if len(filePath) > 4 {
 		ext = strings.ToLower(filePath[len(filePath)-4:])
@@ -58,10 +63,10 @@ func ImportCommand(filePath, profileName string) error {
 				return err
 			}
 		} else if ext == ".json" {
-			// JSON: lire et importer comme tel
+			// JSON: read and import as is
 			cfg, err := config.ReadConfig(filePath[:len(filePath)-5])
 			if err != nil {
-				return fmt.Errorf("erreur lecture JSON: %w", err)
+				return fmt.Errorf("error reading JSON: %w", err)
 			}
 			if profileName != "" {
 				cfg.ProfileName = profileName
@@ -74,16 +79,16 @@ func ImportCommand(filePath, profileName string) error {
 				return err
 			}
 		} else {
-			return fmt.Errorf("format non supporté: %s", ext)
+			return fmt.Errorf("unsupported format: %s", ext)
 		}
 	} else {
-		return fmt.Errorf("fichier invalide: %s", filePath)
+		return fmt.Errorf("invalid file: %s", filePath)
 	}
 
 	if profileName == "" {
 		profileName = "imported"
 	}
 
-	fmt.Printf("✓ Configuration importée sous le nom '%s'\n", profileName)
+	fmt.Printf("✓ Configuration imported as '%s'\n", profileName)
 	return nil
 }

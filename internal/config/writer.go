@@ -11,16 +11,16 @@ import (
 	"github.com/otori-lab/otori-cli/internal/models"
 )
 
-// WriteConfig écrit la configuration dans un fichier JSON
+// WriteConfig writes the configuration to a JSON file
 func WriteConfig(config *models.Config) error {
-	// Ajouter le timestamp
+	// Add timestamp
 	config.CreatedAt = time.Now().Format(time.RFC3339)
 
-	// Nettoyer les utilisateurs (enlever les caractères nuls et vides)
+	// Clean users (remove null and empty characters)
 	var cleanedUsers []string
 	for _, user := range config.Users {
 		cleaned := strings.TrimSpace(user)
-		// Enlever tous les caractères nuls et de contrôle
+		// Remove all null and control characters
 		cleaned = removeNullChars(cleaned)
 		if cleaned != "" {
 			cleanedUsers = append(cleanedUsers, cleaned)
@@ -28,32 +28,32 @@ func WriteConfig(config *models.Config) error {
 	}
 	config.Users = cleanedUsers
 
-	// Créer le répertoire de configuration s'il n'existe pas
+	// Create config directory if it doesn't exist
 	configDir := getConfigDir()
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("erreur création du répertoire config: %w", err)
+		return fmt.Errorf("error creating config directory: %w", err)
 	}
 
-	// Construire le nom du fichier
+	// Build filename
 	filename := filepath.Join(configDir, config.ProfileName+".json")
 
-	// Encoder la configuration en JSON
+	// Encode configuration to JSON
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return fmt.Errorf("erreur encoding JSON: %w", err)
+		return fmt.Errorf("error encoding JSON: %w", err)
 	}
 
-	// Écrire le fichier
+	// Write file
 	if err := os.WriteFile(filename, data, 0644); err != nil {
-		return fmt.Errorf("erreur écriture fichier: %w", err)
+		return fmt.Errorf("error writing file: %w", err)
 	}
 
 	return nil
 }
 
-// WriteConfigWithName écrit une configuration avec un nom de profil spécifique (pour l'édition)
+// WriteConfigWithName writes a configuration with a specific profile name (for editing)
 func WriteConfigWithName(profileName string, config *models.Config) error {
-	// Nettoyer les utilisateurs (enlever les caractères nuls et vides)
+	// Clean users (remove null and empty characters)
 	var cleanedUsers []string
 	for _, user := range config.Users {
 		cleaned := strings.TrimSpace(user)
@@ -64,30 +64,30 @@ func WriteConfigWithName(profileName string, config *models.Config) error {
 	}
 	config.Users = cleanedUsers
 
-	// Créer le répertoire de configuration s'il n'existe pas
+	// Create config directory if it doesn't exist
 	configDir := getConfigDir()
 	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("erreur création du répertoire config: %w", err)
+		return fmt.Errorf("error creating config directory: %w", err)
 	}
 
-	// Construire le nom du fichier avec le nom spécifié
+	// Build filename with specified name
 	filename := filepath.Join(configDir, profileName+".json")
 
-	// Encoder la configuration en JSON
+	// Encode configuration to JSON
 	data, err := json.MarshalIndent(config, "", "  ")
 	if err != nil {
-		return fmt.Errorf("erreur encoding JSON: %w", err)
+		return fmt.Errorf("error encoding JSON: %w", err)
 	}
 
-	// Écrire le fichier
+	// Write file
 	if err := os.WriteFile(filename, data, 0644); err != nil {
-		return fmt.Errorf("erreur écriture fichier: %w", err)
+		return fmt.Errorf("error writing file: %w", err)
 	}
 
 	return nil
 }
 
-// ReadConfig lit une configuration depuis un fichier JSON
+// ReadConfig reads a configuration from a JSON file
 func ReadConfig(profileName string) (*models.Config, error) {
 	if profileName == "" {
 		profileName = "default"
@@ -96,18 +96,18 @@ func ReadConfig(profileName string) (*models.Config, error) {
 	filename := filepath.Join(getConfigDir(), profileName+".json")
 	data, err := os.ReadFile(filename)
 	if err != nil {
-		return nil, fmt.Errorf("erreur lecture fichier: %w", err)
+		return nil, fmt.Errorf("error reading file: %w", err)
 	}
 
 	var config models.Config
 	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("erreur decode JSON: %w", err)
+		return nil, fmt.Errorf("error decoding JSON: %w", err)
 	}
 
 	return &config, nil
 }
 
-// ListConfigs liste tous les profils disponibles
+// ListConfigs lists all available profiles
 func ListConfigs() ([]string, error) {
 	configDir := getConfigDir()
 	entries, err := os.ReadDir(configDir)
@@ -128,17 +128,17 @@ func ListConfigs() ([]string, error) {
 	return profiles, nil
 }
 
-// getConfigDir retourne le chemin du répertoire de configuration
+// getConfigDir returns the config directory path
 func getConfigDir() string {
-	// Créer un dossier 'profiles' dans le répertoire courant
+	// Create 'profiles' folder in current directory
 	return "profiles"
 }
 
-// removeNullChars enlève les caractères nuls et de contrôle
+// removeNullChars removes null and control characters
 func removeNullChars(s string) string {
 	var result strings.Builder
 	for _, r := range s {
-		// Garder seulement les caractères imprimables (>= 32, != 127)
+		// Keep only printable characters (>= 32, != 127)
 		if r >= 32 && r != 127 {
 			result.WriteRune(r)
 		}

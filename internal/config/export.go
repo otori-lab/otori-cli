@@ -5,13 +5,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/otori-lab/otori-cli/internal/models"
 	"gopkg.in/yaml.v3"
 )
 
-// ExportFormat représente le format d'export
+// ExportFormat represents the export format
 type ExportFormat string
 
 const (
@@ -20,21 +21,21 @@ const (
 	FormatCSV  ExportFormat = "csv"
 )
 
-// ExportConfig exporte une configuration dans le format spécifié
+// ExportConfig exports a configuration in the specified format
 func ExportConfig(profileName string, format ExportFormat, outputPath string) error {
 	cfg, err := ReadConfig(profileName)
 	if err != nil {
-		return fmt.Errorf("profil '%s' non trouvé: %w", profileName, err)
+		return fmt.Errorf("profile '%s' not found: %w", profileName, err)
 	}
 
 	if outputPath == "" {
 		outputPath = filepath.Join("exports", profileName+"."+string(format))
 	}
 
-	// Créer le répertoire d'export s'il n'existe pas
+	// Create export directory if it doesn't exist
 	dir := filepath.Dir(outputPath)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("erreur création répertoire: %w", err)
+		return fmt.Errorf("error creating directory: %w", err)
 	}
 
 	switch format {
@@ -43,54 +44,44 @@ func ExportConfig(profileName string, format ExportFormat, outputPath string) er
 	case FormatCSV:
 		return exportCSV(cfg, outputPath)
 	case FormatJSON:
-		// JSON déjà supporté nativement
-		return fmt.Errorf("utiliser WriteConfig pour JSON")
+		// JSON already supported natively
+		return fmt.Errorf("use WriteConfig for JSON")
 	default:
-		return fmt.Errorf("format non supporté: %s", format)
+		return fmt.Errorf("unsupported format: %s", format)
 	}
 }
 
-// exportYAML exporte au format YAML
+// exportYAML exports to YAML format
 func exportYAML(config *models.Config, outputPath string) error {
 	data, err := yaml.Marshal(config)
 	if err != nil {
-		return fmt.Errorf("erreur encoding YAML: %w", err)
+		return fmt.Errorf("error encoding YAML: %w", err)
 	}
 
 	if err := os.WriteFile(outputPath, data, 0644); err != nil {
-		return fmt.Errorf("erreur écriture fichier: %w", err)
+		return fmt.Errorf("error writing file: %w", err)
 	}
 
 	return nil
 }
 
-// exportCSV exporte au format CSV
+// exportCSV exports to CSV format
 func exportCSV(config *models.Config, outputPath string) error {
 	file, err := os.Create(outputPath)
 	if err != nil {
-		return fmt.Errorf("erreur création fichier: %w", err)
+		return fmt.Errorf("error creating file: %w", err)
 	}
 	defer file.Close()
 
 	writer := csv.NewWriter(file)
 	defer writer.Flush()
 
-	// En-têtes
+	// Headers
 	headers := []string{"Type", "ServerName", "ProfileName", "Company", "Users"}
 	writer.Write(headers)
 
-	// Données
-	usersStr := ""
-	if len(config.Users) > 0 {
-		for i, user := range config.Users {
-			if user != "" {
-				if i > 0 {
-					usersStr += "; "
-				}
-				usersStr += user
-			}
-		}
-	}
+	// Data - join users with "; " separator
+	usersStr := strings.Join(config.Users, "; ")
 
 	row := []string{
 		config.Type,
@@ -104,19 +95,19 @@ func exportCSV(config *models.Config, outputPath string) error {
 	return nil
 }
 
-// ImportYAML importe une configuration depuis YAML
+// ImportYAML imports a configuration from YAML
 func ImportYAML(filePath string, profileName string) error {
 	data, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("erreur lecture fichier: %w", err)
+		return fmt.Errorf("error reading file: %w", err)
 	}
 
 	var config models.Config
 	if err := yaml.Unmarshal(data, &config); err != nil {
-		return fmt.Errorf("erreur decode YAML: %w", err)
+		return fmt.Errorf("error decoding YAML: %w", err)
 	}
 
-	// Utiliser le nom du profil fourni ou celui du fichier
+	// Use provided profile name or the one from file
 	if profileName == "" {
 		profileName = config.ProfileName
 		if profileName == "" {
@@ -127,41 +118,41 @@ func ImportYAML(filePath string, profileName string) error {
 	config.ProfileName = profileName
 	config.CreatedAt = time.Now().Format(time.RFC3339)
 
-	// Valider avant d'importer
+	// Validate before importing
 	validationErrors := ValidateConfig(&config)
 	if len(validationErrors) > 0 {
-		return fmt.Errorf("configuration invalide: %v", validationErrors[0].Message)
+		return fmt.Errorf("invalid configuration: %v", validationErrors[0].Message)
 	}
 
 	return WriteConfig(&config)
 }
 
-// ImportCSV importe une configuration depuis CSV
+// ImportCSV imports a configuration from CSV
 func ImportCSV(filePath string, profileName string) error {
 	file, err := os.Open(filePath)
 	if err != nil {
-		return fmt.Errorf("erreur ouverture fichier: %w", err)
+		return fmt.Errorf("error opening file: %w", err)
 	}
 	defer file.Close()
 
 	reader := csv.NewReader(file)
 	records, err := reader.ReadAll()
 	if err != nil {
-		return fmt.Errorf("erreur lecture CSV: %w", err)
+		return fmt.Errorf("error reading CSV: %w", err)
 	}
 
 	if len(records) < 2 {
-		return fmt.Errorf("CSV vide")
+		return fmt.Errorf("empty CSV")
 	}
 
-	// Sauter les en-têtes et lire la première ligne
+	// Skip headers and read first data row
 	row := records[1]
 	if len(row) < 5 {
-		return fmt.Errorf("CSV invalide: colonnes manquantes")
+		return fmt.Errorf("invalid CSV: missing columns")
 	}
 
 	config := models.NewConfig()
-	config.Type = row[0]
+	config.Type = strings.ToLower(row[0]) // Normalize type to lowercase
 	config.ServerName = row[1]
 	config.ProfileName = row[2]
 	if profileName != "" {
@@ -169,21 +160,25 @@ func ImportCSV(filePath string, profileName string) error {
 	}
 	config.Company = row[3]
 
-	// Parser les utilisateurs (séparés par "; ")
+	// Parse users (separated by "; ")
 	if row[4] != "" {
 		usersStr := row[4]
-		// Traiter différents séparateurs
-		if len(usersStr) > 0 {
-			config.Users = []string{usersStr}
+		// Split by "; " separator and clean each user
+		users := strings.Split(usersStr, "; ")
+		for _, user := range users {
+			cleaned := strings.TrimSpace(user)
+			if cleaned != "" {
+				config.Users = append(config.Users, cleaned)
+			}
 		}
 	}
 
 	config.CreatedAt = time.Now().Format(time.RFC3339)
 
-	// Valider avant d'importer
+	// Validate before importing
 	validationErrors := ValidateConfig(config)
 	if len(validationErrors) > 0 {
-		return fmt.Errorf("configuration invalide: %v", validationErrors[0].Message)
+		return fmt.Errorf("invalid configuration: %v", validationErrors[0].Message)
 	}
 
 	return WriteConfig(config)

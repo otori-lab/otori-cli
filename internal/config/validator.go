@@ -7,56 +7,56 @@ import (
 	"github.com/otori-lab/otori-cli/internal/models"
 )
 
-// ValidationError représente une erreur de validation
+// ValidationError represents a validation error
 type ValidationError struct {
 	Field   string
 	Message string
 }
 
-// ValidateConfig valide une configuration
+// ValidateConfig validates a configuration
 func ValidateConfig(config *models.Config) []ValidationError {
 	var errors []ValidationError
 
-	// Vérifier le type
+	// Check type
 	if config.Type == "" {
 		errors = append(errors, ValidationError{
 			Field:   "Type",
-			Message: "Type obligatoire",
+			Message: "Type is required",
 		})
-	} else if config.Type != "classique" && config.Type != "IA" {
+	} else if config.Type != "classic" && config.Type != "ia" {
 		errors = append(errors, ValidationError{
 			Field:   "Type",
-			Message: "Type doit être 'classique' ou 'IA'",
+			Message: "Type must be 'classic' or 'ia'",
 		})
 	}
 
-	// Vérifier le serveur
+	// Check server name
 	if config.ServerName == "" {
 		errors = append(errors, ValidationError{
 			Field:   "ServerName",
-			Message: "Nom du serveur obligatoire",
+			Message: "Server name is required",
 		})
 	} else if len(config.ServerName) < 3 {
 		errors = append(errors, ValidationError{
 			Field:   "ServerName",
-			Message: "Nom du serveur doit avoir au moins 3 caractères",
+			Message: "Server name must be at least 3 characters",
 		})
 	}
 
-	// Vérifier le profil
+	// Check profile name
 	if config.ProfileName == "" {
 		errors = append(errors, ValidationError{
 			Field:   "ProfileName",
-			Message: "Nom du profil obligatoire",
+			Message: "Profile name is required",
 		})
-	} else if !isValidProfileName(config.ProfileName) {
+	} else if !IsValidProfileName(config.ProfileName) {
 		errors = append(errors, ValidationError{
 			Field:   "ProfileName",
-			Message: "Nom du profil doit contenir seulement des caractères alphanumériques, tirets et underscores",
+			Message: "Profile name must contain only alphanumeric characters, hyphens and underscores",
 		})
 	}
 
-	// Vérifier qu'il n'y a pas de doublons dans les utilisateurs
+	// Check for duplicate users
 	uniqueUsers := make(map[string]bool)
 	for _, user := range config.Users {
 		if user != "" {
@@ -64,7 +64,7 @@ func ValidateConfig(config *models.Config) []ValidationError {
 			if uniqueUsers[lowerUser] {
 				errors = append(errors, ValidationError{
 					Field:   "Users",
-					Message: fmt.Sprintf("L'utilisateur '%s' est en doublon", user),
+					Message: fmt.Sprintf("Duplicate user '%s'", user),
 				})
 			}
 			uniqueUsers[lowerUser] = true
@@ -74,8 +74,8 @@ func ValidateConfig(config *models.Config) []ValidationError {
 	return errors
 }
 
-// isValidProfileName vérifie si un nom de profil est valide
-func isValidProfileName(name string) bool {
+// IsValidProfileName checks if a profile name is valid (exported for reuse)
+func IsValidProfileName(name string) bool {
 	if name == "" || len(name) > 100 {
 		return false
 	}
@@ -91,7 +91,7 @@ func isValidProfileName(name string) bool {
 	return true
 }
 
-// ProfileExists vérifie si un profil existe déjà
+// ProfileExists checks if a profile already exists
 func ProfileExists(profileName string) bool {
 	profiles, err := ListConfigs()
 	if err != nil {

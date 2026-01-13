@@ -9,6 +9,7 @@ import (
 	"github.com/otori-lab/otori-cli/internal/config"
 	"github.com/otori-lab/otori-cli/internal/models"
 	"github.com/otori-lab/otori-cli/internal/tui"
+	"github.com/otori-lab/otori-cli/internal/ui"
 	"github.com/spf13/cobra"
 )
 
@@ -24,12 +25,15 @@ var initCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		if cmd.Flags().NFlag() == 0 {
-			// Mode interactif avec TUI Bubble Tea
+			// Interactive mode with TUI Bubble Tea
 			runInteractiveInit()
 			return
 		}
 
-		// Mode non-interactif: validation des champs requis
+		// Display logo
+		fmt.Println(ui.GetLogo())
+
+		// Non-interactive mode: validate required fields
 		if initType == "" {
 			fmt.Println("Error: --type is required in non-interactive mode")
 			os.Exit(1)
@@ -39,93 +43,109 @@ var initCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		// Normaliser et valider le type
+		// Normalize type to lowercase
 		normalizedType := strings.ToLower(initType)
-		if normalizedType != "classic" && normalizedType != "ia" {
-			fmt.Println("Error: --type must be 'classic' or 'ia'")
-			os.Exit(1)
-		}
 
-		// Créer la configuration
+		// Create configuration
 		cfg := models.NewConfig()
 		cfg.Type = normalizedType
 		cfg.ServerName = initServerName
 		cfg.Company = initCompanyName
 		cfg.Users = initUsers
 
-		// Définir le nom du profil (default si vide)
+		// Set profile name (default if empty)
 		if initProfileName != "" {
 			cfg.ProfileName = initProfileName
 		} else {
 			cfg.ProfileName = "default"
 		}
 
-		// Sauvegarder la configuration
-		if err := config.WriteConfig(cfg); err != nil {
-			fmt.Printf("Erreur lors de la sauvegarde: %v\n", err)
+		// Validate configuration
+		validationErrors := config.ValidateConfig(cfg)
+		if len(validationErrors) > 0 {
+			fmt.Println("Validation errors:")
+			for _, err := range validationErrors {
+				fmt.Printf("  - %s: %s\n", err.Field, err.Message)
+			}
 			os.Exit(1)
 		}
 
-		fmt.Printf("✓ Profil '%s' créé avec succès!\n", cfg.ProfileName)
+		// Save configuration
+		if err := config.WriteConfig(cfg); err != nil {
+			fmt.Printf("Error saving configuration: %v\n", err)
+			os.Exit(1)
+		}
+
+		fmt.Printf("✓ Profile '%s' created successfully!\n", cfg.ProfileName)
 
 	},
 }
 
-// runInteractiveInit lance le TUI interactif pour créer un profil
+// runInteractiveInit runs the interactive TUI to create a profile
 func runInteractiveInit() {
-	// Étape 1: Lancer le formulaire
+	// Step 1: Launch the form
 	formModel := tui.NewModel()
 	formProgram := tea.NewProgram(formModel)
 
 	finalFormModel, err := formProgram.Run()
 	if err != nil {
-		fmt.Printf("Erreur lors du formulaire: %v\n", err)
+		fmt.Printf("Error during form: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Vérifier si l'utilisateur a annulé
+	// Check if user cancelled
 	form, ok := finalFormModel.(tui.Model)
 	if !ok {
-		fmt.Println("Erreur: impossible de récupérer le formulaire")
+		fmt.Println("Error: unable to retrieve form")
 		os.Exit(1)
 	}
 
 	if form.IsCancelled() {
-		fmt.Println("Configuration annulée.")
+		fmt.Println("Configuration cancelled.")
 		return
 	}
 
-	// Récupérer la configuration du formulaire
+	// Get configuration from form
 	cfg := form.GetConfig()
 
-	// Étape 2: Lancer le preview pour confirmation
+	// Step 2: Launch preview for confirmation
 	previewModel := tui.NewPreviewModel(cfg)
 	previewProgram := tea.NewProgram(previewModel)
 
 	finalPreviewModel, err := previewProgram.Run()
 	if err != nil {
-		fmt.Printf("Erreur lors du preview: %v\n", err)
+		fmt.Printf("Error during preview: %v\n", err)
 		os.Exit(1)
 	}
 
 	preview, ok := finalPreviewModel.(tui.PreviewModel)
 	if !ok {
-		fmt.Println("Erreur: impossible de récupérer le preview")
+		fmt.Println("Error: unable to retrieve preview")
 		os.Exit(1)
 	}
 
 	if preview.IsCancelled() || !preview.IsConfirmed() {
-		fmt.Println("Configuration annulée.")
+		fmt.Println("Configuration cancelled.")
 		return
 	}
 
-	// Étape 3: Sauvegarder la configuration
-	if err := config.WriteConfig(cfg); err != nil {
-		fmt.Printf("Erreur lors de la sauvegarde: %v\n", err)
+	// Step 3: Validate configuration
+	validationErrors := config.ValidateConfig(cfg)
+	if len(validationErrors) > 0 {
+		fmt.Println("Validation errors:")
+		for _, err := range validationErrors {
+			fmt.Printf("  - %s: %s\n", err.Field, err.Message)
+		}
 		os.Exit(1)
 	}
 
-	fmt.Printf("✓ Profil '%s' créé avec succès!\n", cfg.ProfileName)
+	// Step 4: Save configuration
+	if err := config.WriteConfig(cfg); err != nil {
+		fmt.Printf("Error saving configuration: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✓ Profile '%s' created successfully!\n", cfg.ProfileName)
 }
 
 func init() {

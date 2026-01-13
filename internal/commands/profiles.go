@@ -7,29 +7,32 @@ import (
 	"text/tabwriter"
 
 	"github.com/otori-lab/otori-cli/internal/config"
+	"github.com/otori-lab/otori-cli/internal/ui"
 )
 
-// ListCommand liste tous les profils disponibles
+// ListCommand lists all available profiles
 func ListCommand() error {
+	fmt.Println(ui.GetLogo())
+
 	profiles, err := config.ListConfigs()
 	if err != nil {
-		return fmt.Errorf("erreur lecture des profils: %w", err)
+		return fmt.Errorf("error reading profiles: %w", err)
 	}
 
 	if len(profiles) == 0 {
-		fmt.Println("Aucun profil trouvé. Créez-en un avec: otori init")
+		fmt.Println("No profiles found. Create one with: otori init")
 		return nil
 	}
 
-	fmt.Println("\n📋 Profils disponibles:\n")
+	fmt.Println("\nAvailable profiles:\n")
 
 	w := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(w, "PROFIL\tTYPE\tSERVEUR\tENTREPRISE\tCRÉATION")
+	fmt.Fprintln(w, "PROFILE\tTYPE\tSERVER\tCOMPANY\tCREATED")
 
 	for _, name := range profiles {
 		cfg, err := config.ReadConfig(name)
 		if err != nil {
-			fmt.Fprintf(w, "%s\t[erreur]\t-\t-\t-\n", name)
+			fmt.Fprintf(w, "%s\t[error]\t-\t-\t-\n", name)
 			continue
 		}
 
@@ -47,65 +50,69 @@ func ListCommand() error {
 	return nil
 }
 
-// ShowCommand affiche les détails d'un profil
+// ShowCommand displays profile details
 func ShowCommand(profileName string) error {
+	fmt.Println(ui.GetLogo())
+
 	if profileName == "" {
 		profileName = "default"
 	}
 
 	cfg, err := config.ReadConfig(profileName)
 	if err != nil {
-		return fmt.Errorf("profil '%s' non trouvé: %w", profileName, err)
+		return fmt.Errorf("profile '%s' not found: %w", profileName, err)
 	}
 
-	fmt.Printf("\n📄 Profil: %s\n\n", profileName)
-	fmt.Printf("  Type:        %s\n", cfg.Type)
-	fmt.Printf("  Serveur:     %s\n", cfg.ServerName)
-	fmt.Printf("  Entreprise:  %s\n", cfg.Company)
-	fmt.Printf("  Créé:        %s\n\n", cfg.CreatedAt)
+	fmt.Printf("\nProfile: %s\n\n", profileName)
+	fmt.Printf("  Type:       %s\n", cfg.Type)
+	fmt.Printf("  Server:     %s\n", cfg.ServerName)
+	fmt.Printf("  Company:    %s\n", cfg.Company)
+	fmt.Printf("  Created:    %s\n\n", cfg.CreatedAt)
 
 	if len(cfg.Users) > 0 {
-		fmt.Println("  Utilisateurs:")
+		fmt.Println("  Users:")
 		for _, user := range cfg.Users {
-			fmt.Printf("    • %s\n", user)
+			fmt.Printf("    - %s\n", user)
 		}
 	} else {
-		fmt.Println("  Utilisateurs: (aucun)")
+		fmt.Println("  Users: (none)")
 	}
 	fmt.Println()
 
 	return nil
 }
 
-// DeleteCommand supprime un profil
+// DeleteCommand deletes a profile
 func DeleteCommand(profileName string) error {
+	fmt.Println(ui.GetLogo())
+
 	if profileName == "" {
-		return fmt.Errorf("veuillez spécifier le nom du profil à supprimer")
+		return fmt.Errorf("please specify the profile name to delete")
 	}
 
 	// Confirmation
-	fmt.Printf("⚠️  Êtes-vous sûr de vouloir supprimer le profil '%s'? (oui/non): ", profileName)
+	fmt.Printf("Are you sure you want to delete profile '%s'? (yes/no): ", profileName)
 	var response string
 	fmt.Scanln(&response)
 
-	if response != "oui" && response != "yes" && response != "y" {
-		fmt.Println("❌ Suppression annulée")
+	if response != "yes" && response != "y" {
+		fmt.Println("Deletion cancelled")
 		return nil
 	}
 
-	// Trouver le fichier
+	// Find file
 	configDir := "profiles"
 	filename := filepath.Join(configDir, profileName+".json")
 
 	if _, err := os.Stat(filename); os.IsNotExist(err) {
-		return fmt.Errorf("profil '%s' non trouvé", profileName)
+		return fmt.Errorf("profile '%s' not found", profileName)
 	}
 
-	// Supprimer
+	// Delete
 	if err := os.Remove(filename); err != nil {
-		return fmt.Errorf("erreur suppression du profil: %w", err)
+		return fmt.Errorf("error deleting profile: %w", err)
 	}
 
-	fmt.Printf("✓ Profil '%s' supprimé avec succès\n", profileName)
+	fmt.Printf("✓ Profile '%s' deleted successfully\n", profileName)
 	return nil
 }
