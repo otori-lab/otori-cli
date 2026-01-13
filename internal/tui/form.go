@@ -48,7 +48,39 @@ type Field struct {
 
 // NewModel crée un nouveau modèle de formulaire
 func NewModel() Model {
-	return Model{
+	return createModel("", nil)
+}
+
+// NewModelWithConfig crée un nouveau modèle de formulaire pré-rempli avec une configuration existante
+func NewModelWithConfig(cfg *models.Config) Model {
+	return createModel("edit", cfg)
+}
+
+// createModel est une fonction interne pour créer le modèle
+func createModel(mode string, cfg *models.Config) Model {
+	// Initialiser avec des valeurs par défaut
+	typeValue := "classique"
+	serverValue := ""
+	profileValue := ""
+	companyValue := ""
+	var usersList []string
+	selectTypeIndex := 0
+
+	// Si on édite une config existante, pré-remplir les champs
+	if cfg != nil {
+		typeValue = cfg.Type
+		serverValue = cfg.ServerName
+		profileValue = cfg.ProfileName
+		companyValue = cfg.Company
+		usersList = cfg.Users
+
+		// Trouver l'index du type sélectionné
+		if typeValue == "IA" {
+			selectTypeIndex = 1
+		}
+	}
+
+	model := Model{
 		config: models.NewConfig(),
 		fields: []Field{
 			{
@@ -57,7 +89,7 @@ func NewModel() Model {
 				required:  true,
 				fieldType: FieldTypeSelect,
 				options:   []string{"classique", "IA"},
-				value:     "classique",
+				value:     typeValue,
 			},
 			{
 				name:        "serverName",
@@ -65,18 +97,21 @@ func NewModel() Model {
 				placeholder: "ex: mon-serveur",
 				required:    true,
 				fieldType:   FieldTypeText,
+				value:       serverValue,
 			},
 			{
 				name:        "profileName",
 				label:       "Nom du profil",
 				placeholder: "default si vide",
 				fieldType:   FieldTypeText,
+				value:       profileValue,
 			},
 			{
 				name:        "company",
 				label:       "Entreprise",
 				placeholder: "optionnel",
 				fieldType:   FieldTypeText,
+				value:       companyValue,
 			},
 			{
 				name:        "users",
@@ -85,10 +120,12 @@ func NewModel() Model {
 				fieldType:   FieldTypeList,
 			},
 		},
-		selectIndex: make(map[string]int),
+		selectIndex: map[string]int{"type": selectTypeIndex},
 		listInput:   "",
-		listUsers:   []string{},
+		listUsers:   usersList,
 	}
+
+	return model
 }
 
 // Init initialise le modèle
@@ -452,7 +489,7 @@ func isValidProfileName(name string) bool {
 // cleanUser nettoie une entrée utilisateur
 func cleanUser(user string) string {
 	cleaned := strings.TrimSpace(user)
-	
+
 	// Enlever tous les caractères nuls et de contrôle
 	var result strings.Builder
 	for _, r := range cleaned {
@@ -460,7 +497,7 @@ func cleanUser(user string) string {
 			result.WriteRune(r)
 		}
 	}
-	
+
 	return strings.TrimSpace(result.String())
 }
 

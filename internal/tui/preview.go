@@ -11,16 +11,16 @@ import (
 
 // PreviewModel affiche un aperçu de la configuration avant validation
 type PreviewModel struct {
-	config     *models.Config
-	confirmed  bool
-	cancelled  bool
+	config      *models.Config
+	confirmed   bool
+	cancelled   bool
 	selectedYes bool
 }
 
 // NewPreviewModel crée un nouveau modèle de preview
 func NewPreviewModel(config *models.Config) PreviewModel {
 	return PreviewModel{
-		config:     config,
+		config:      config,
 		selectedYes: true, // Par défaut on confirme
 	}
 }

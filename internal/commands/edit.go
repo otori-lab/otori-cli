@@ -20,8 +20,8 @@ func EditCommand(profileName string) error {
 		return fmt.Errorf("profil '%s' non trouvé: %w", profileName, err)
 	}
 
-	// Créer le modèle de formulaire
-	model := tui.NewModel()
+	// Créer le modèle de formulaire pré-rempli avec les données existantes
+	model := tui.NewModelWithConfig(cfg)
 
 	// Lancer le programme TUI
 	p := tea.NewProgram(model, tea.WithAltScreen())
@@ -42,7 +42,7 @@ func EditCommand(profileName string) error {
 	// Obtenir la configuration finale
 	finalConfig := m.GetConfig()
 	finalConfig.CreatedAt = cfg.CreatedAt // Préserver la date de création
-	
+
 	// Préserver le nom du profil si l'utilisateur veut le garder
 	if finalConfig.ProfileName == "" {
 		finalConfig.ProfileName = profileName
@@ -51,7 +51,7 @@ func EditCommand(profileName string) error {
 	// Afficher un aperçu avant confirmation
 	previewModel := tui.NewPreviewModel(finalConfig)
 	p = tea.NewProgram(previewModel, tea.WithAltScreen())
-	
+
 	finalPreview, err := p.Run()
 	if err != nil {
 		return fmt.Errorf("erreur aperçu: %w", err)
@@ -73,4 +73,3 @@ func EditCommand(profileName string) error {
 	fmt.Printf("✓ Profil '%s' modifié avec succès\n", profileName)
 	return nil
 }
-
