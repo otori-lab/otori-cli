@@ -38,6 +38,31 @@ func WriteConfig(config *models.Config) error {
 	return nil
 }
 
+// WriteConfigWithName écrit une configuration avec un nom de profil spécifique (pour l'édition)
+func WriteConfigWithName(profileName string, config *models.Config) error {
+	// Créer le répertoire de configuration s'il n'existe pas
+	configDir := getConfigDir()
+	if err := os.MkdirAll(configDir, 0755); err != nil {
+		return fmt.Errorf("erreur création du répertoire config: %w", err)
+	}
+
+	// Construire le nom du fichier avec le nom spécifié
+	filename := filepath.Join(configDir, profileName+".json")
+
+	// Encoder la configuration en JSON
+	data, err := json.MarshalIndent(config, "", "  ")
+	if err != nil {
+		return fmt.Errorf("erreur encoding JSON: %w", err)
+	}
+
+	// Écrire le fichier
+	if err := os.WriteFile(filename, data, 0644); err != nil {
+		return fmt.Errorf("erreur écriture fichier: %w", err)
+	}
+
+	return nil
+}
+
 // ReadConfig lit une configuration depuis un fichier JSON
 func ReadConfig(profileName string) (*models.Config, error) {
 	if profileName == "" {
