@@ -449,6 +449,21 @@ func isValidProfileName(name string) bool {
 	return true
 }
 
+// cleanUser nettoie une entrée utilisateur
+func cleanUser(user string) string {
+	cleaned := strings.TrimSpace(user)
+	
+	// Enlever tous les caractères nuls et de contrôle
+	var result strings.Builder
+	for _, r := range cleaned {
+		if r >= 32 && r != 127 { // Garder seulement les caractères imprimables
+			result.WriteRune(r)
+		}
+	}
+	
+	return strings.TrimSpace(result.String())
+}
+
 // GetConfig retourne la configuration remplie
 func (m Model) GetConfig() *models.Config {
 	config := models.NewConfig()
@@ -469,9 +484,7 @@ func (m Model) GetConfig() *models.Config {
 		case "users":
 			// Nettoyer et ajouter les utilisateurs (sans caractères nuls ou vides)
 			for _, user := range m.listUsers {
-				cleaned := strings.TrimSpace(user)
-				// Enlever les caractères nuls
-				cleaned = strings.Trim(cleaned, "\x00")
+				cleaned := cleanUser(user)
 				if cleaned != "" {
 					config.Users = append(config.Users, cleaned)
 				}

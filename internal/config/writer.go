@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/otori-lab/otori-cli/internal/models"
@@ -14,6 +15,18 @@ import (
 func WriteConfig(config *models.Config) error {
 	// Ajouter le timestamp
 	config.CreatedAt = time.Now().Format(time.RFC3339)
+
+	// Nettoyer les utilisateurs (enlever les caractères nuls et vides)
+	var cleanedUsers []string
+	for _, user := range config.Users {
+		cleaned := strings.TrimSpace(user)
+		// Enlever tous les caractères nuls et de contrôle
+		cleaned = removeNullChars(cleaned)
+		if cleaned != "" {
+			cleanedUsers = append(cleanedUsers, cleaned)
+		}
+	}
+	config.Users = cleanedUsers
 
 	// Créer le répertoire de configuration s'il n'existe pas
 	configDir := getConfigDir()
@@ -40,6 +53,17 @@ func WriteConfig(config *models.Config) error {
 
 // WriteConfigWithName écrit une configuration avec un nom de profil spécifique (pour l'édition)
 func WriteConfigWithName(profileName string, config *models.Config) error {
+	// Nettoyer les utilisateurs (enlever les caractères nuls et vides)
+	var cleanedUsers []string
+	for _, user := range config.Users {
+		cleaned := strings.TrimSpace(user)
+		cleaned = removeNullChars(cleaned)
+		if cleaned != "" {
+			cleanedUsers = append(cleanedUsers, cleaned)
+		}
+	}
+	config.Users = cleanedUsers
+
 	// Créer le répertoire de configuration s'il n'existe pas
 	configDir := getConfigDir()
 	if err := os.MkdirAll(configDir, 0755); err != nil {
@@ -108,4 +132,16 @@ func ListConfigs() ([]string, error) {
 func getConfigDir() string {
 	// Créer un dossier 'profiles' dans le répertoire courant
 	return "profiles"
+}
+
+// removeNullChars enlève les caractères nuls et de contrôle
+func removeNullChars(s string) string {
+	var result strings.Builder
+	for _, r := range s {
+		// Garder seulement les caractères imprimables (>= 32, != 127)
+		if r >= 32 && r != 127 {
+			result.WriteRune(r)
+		}
+	}
+	return strings.TrimSpace(result.String())
 }
