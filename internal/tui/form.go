@@ -414,6 +414,38 @@ func (m *Model) validateCurrentField() bool {
 		return false
 	}
 
+	// Validations spécifiques selon le champ
+	switch field.name {
+	case "serverName":
+		if len(value) < 3 {
+			m.err = "Le serveur doit avoir au moins 3 caractères"
+			return false
+		}
+
+	case "profileName":
+		if len(value) > 0 && !isValidProfileName(value) {
+			m.err = "Utilisez seulement des lettres, chiffres, tirets et underscores"
+			return false
+		}
+	}
+
+	return true
+}
+
+// isValidProfileName vérifie si un nom de profil est valide
+func isValidProfileName(name string) bool {
+	if name == "" || len(name) > 100 {
+		return false
+	}
+
+	for _, ch := range name {
+		if !((ch >= 'a' && ch <= 'z') ||
+			(ch >= 'A' && ch <= 'Z') ||
+			(ch >= '0' && ch <= '9') ||
+			ch == '-' || ch == '_') {
+			return false
+		}
+	}
 	return true
 }
 

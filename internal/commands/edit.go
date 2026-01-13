@@ -48,6 +48,23 @@ func EditCommand(profileName string) error {
 		finalConfig.ProfileName = profileName
 	}
 
+	// Afficher un aperçu avant confirmation
+	previewModel := tui.NewPreviewModel(finalConfig)
+	p = tea.NewProgram(previewModel, tea.WithAltScreen())
+	
+	finalPreview, err := p.Run()
+	if err != nil {
+		return fmt.Errorf("erreur aperçu: %w", err)
+	}
+
+	preview := finalPreview.(tui.PreviewModel)
+
+	// Si l'utilisateur a refusé
+	if !preview.IsConfirmed() || preview.IsCancelled() {
+		fmt.Println("\n❌ Édition annulée")
+		return nil
+	}
+
 	// Écrire la configuration modifiée
 	if err := config.WriteConfigWithName(profileName, finalConfig); err != nil {
 		return fmt.Errorf("erreur sauvegarde: %w", err)
