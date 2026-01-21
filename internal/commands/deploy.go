@@ -5,6 +5,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/otori-lab/otori-cli/internal/config"
 	"github.com/otori-lab/otori-cli/internal/ui"
@@ -79,6 +81,55 @@ func runDeploy() error {
 		return fmt.Errorf("failed to start containers: %w", err)
 	}
 
+	// Update fs.pickle with custom honeyfs entries
+	containerName := "otori-" + profileName
+	fmt.Println()
+	fmt.Println("Updating filesystem structure...")
+
+	// Wait for container to be fully ready
+	time.Sleep(3 * time.Second)
+
+	// Get custom paths from honeyfs that need to be added to fs.pickle
+	honeyfsDir := filepath.Join(profileDir, "honeyfs")
+	fsctlCommands := generateFsctlCommands(honeyfsDir)
+
+	if len(fsctlCommands) > 0 {
+		// Build fsctl command string (one command per line, ending with exit)
+		fsctlInput := strings.Join(fsctlCommands, "\n") + "\nexit\n"
+
+		// Run fsctl inside the container using Python with correct PYTHONPATH
+		// Command: docker exec -i -e PYTHONPATH=/cowrie/cowrie-git/src <container>
+		//          /cowrie/cowrie-env/bin/python3 -m cowrie.scripts.fsctl
+		//          /cowrie/cowrie-git/src/cowrie/data/fs.pickle
+		fsctlCmd := exec.Command("docker", "exec", "-i",
+			"-e", "PYTHONPATH=/cowrie/cowrie-git/src",
+			containerName,
+			"/cowrie/cowrie-env/bin/python3", "-m", "cowrie.scripts.fsctl",
+			"/cowrie/cowrie-git/src/cowrie/data/fs.pickle")
+
+		// Pipe the commands to fsctl stdin
+		fsctlCmd.Stdin = strings.NewReader(fsctlInput)
+		fsctlCmd.Stdout = os.Stdout
+		fsctlCmd.Stderr = os.Stderr
+
+		if err := fsctlCmd.Run(); err != nil {
+			fmt.Printf("Warning: failed to update fs.pickle: %v\n", err)
+		} else {
+			fmt.Printf("  Added %d custom entries to filesystem\n", len(fsctlCommands))
+
+			// Restart container to reload fs.pickle
+			fmt.Println("Restarting honeypot to apply changes...")
+			restartCmd := exec.Command("docker", "compose", "restart")
+			restartCmd.Dir = profileDir
+			restartCmd.Stdout = os.Stdout
+			restartCmd.Stderr = os.Stderr
+
+			if err := restartCmd.Run(); err != nil {
+				fmt.Printf("Warning: failed to restart container: %v\n", err)
+			}
+		}
+	}
+
 	fmt.Println()
 	fmt.Printf("✓ Honeypot '%s' deployed successfully!\n", profileName)
 	fmt.Println()
@@ -90,6 +141,81 @@ func runDeploy() error {
 	fmt.Println("To stop:         otori stop -p", profileName)
 
 	return nil
+}
+
+// generateFsctlCommands scans the honeyfs directory and generates fsctl commands
+// for custom paths that don't exist in the base Cowrie fs.pickle
+func generateFsctlCommands(honeyfsDir string) []string {
+	var commands []string
+
+	// Base paths that already exist in Cowrie's fs.pickle (no need to add)
+	existingPaths := map[string]bool{
+		"/etc":           true,
+		"/etc/passwd":    true,
+		"/etc/shadow":    true,
+		"/etc/group":     true,
+		"/etc/hostname":  true,
+		"/etc/hosts":     true,
+		"/etc/host.conf": true,
+		"/etc/inittab":   true,
+		"/etc/issue":     true,
+		"/etc/issue.net": true,
+		"/etc/motd":      true,
+		"/etc/resolv.conf": true,
+		"/proc":          true,
+		"/proc/cpuinfo":  true,
+		"/proc/meminfo":  true,
+		"/proc/mounts":   true,
+		"/proc/version":  true,
+		"/proc/modules":  true,
+		"/proc/net":      true,
+		"/proc/net/arp":  true,
+	}
+
+	// Track directories we've already added
+	addedDirs := make(map[string]bool)
+
+	// Walk through honeyfs to find custom paths
+	filepath.Walk(honeyfsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		// Get relative path from honeyfs
+		relPath, err := filepath.Rel(honeyfsDir, path)
+		if err != nil || relPath == "." {
+			return nil
+		}
+
+		// Convert to absolute path as it appears in the honeypot
+		absPath := "/" + relPath
+
+		// Skip if this path already exists in base Cowrie
+		if existingPaths[absPath] {
+			return nil
+		}
+
+		if info.IsDir() {
+			// Add mkdir command for new directories
+			if !addedDirs[absPath] {
+				commands = append(commands, fmt.Sprintf("mkdir %s", absPath))
+				addedDirs[absPath] = true
+			}
+		} else {
+			// Ensure parent directory is created first
+			parentDir := filepath.Dir(absPath)
+			if !existingPaths[parentDir] && !addedDirs[parentDir] {
+				commands = append(commands, fmt.Sprintf("mkdir %s", parentDir))
+				addedDirs[parentDir] = true
+			}
+			// Add touch command for new files
+			commands = append(commands, fmt.Sprintf("touch %s", absPath))
+		}
+
+		return nil
+	})
+
+	return commands
 }
 
 func init() {

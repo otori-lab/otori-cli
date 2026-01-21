@@ -222,12 +222,10 @@ func WriteHoneyFS(profileDir string, config *models.Config) error {
 	var shadowContent strings.Builder
 	shadowContent.WriteString(ShadowTemplate)
 
-	// Add custom users to shadow (with fake password hash)
+	// Add custom users to shadow (no password - auth handled by userdb.txt)
 	for _, user := range users {
 		if user != "root" { // root already in template
-			// Fake bcrypt-like hash for honeypot
-			shadowContent.WriteString(fmt.Sprintf("%s:$6$xyz$fakehash.for.honeypot.user.%s:15800:0:99999:7:::\n",
-				user, user))
+			shadowContent.WriteString(fmt.Sprintf("%s:*:15800:0:99999:7:::\n", user))
 		}
 	}
 
