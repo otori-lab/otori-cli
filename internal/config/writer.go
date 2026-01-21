@@ -11,7 +11,9 @@ import (
 	"github.com/otori-lab/otori-cli/internal/models"
 )
 
-// WriteConfig writes the configuration to a JSON file
+// WriteConfig writes the configuration to a profile directory
+// For "classic" type: creates profile folder with JSON + cowrie.cfg + userdb.txt
+// For "ia" type: creates profile folder with JSON only
 func WriteConfig(config *models.Config) error {
 	// Add timestamp
 	config.CreatedAt = time.Now().Format(time.RFC3339)
@@ -28,14 +30,14 @@ func WriteConfig(config *models.Config) error {
 	}
 	config.Users = cleanedUsers
 
-	// Create config directory if it doesn't exist
-	configDir := getConfigDir()
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("error creating config directory: %w", err)
+	// Create profile directory (profiles/{profileName}/)
+	profileDir := getProfileDir(config.ProfileName)
+	if err := os.MkdirAll(profileDir, 0755); err != nil {
+		return fmt.Errorf("error creating profile directory: %w", err)
 	}
 
-	// Build filename
-	filename := filepath.Join(configDir, config.ProfileName+".json")
+	// Build JSON filename
+	filename := filepath.Join(profileDir, config.ProfileName+".json")
 
 	// Encode configuration to JSON
 	data, err := json.MarshalIndent(config, "", "  ")
@@ -43,9 +45,25 @@ func WriteConfig(config *models.Config) error {
 		return fmt.Errorf("error encoding JSON: %w", err)
 	}
 
-	// Write file
+	// Write JSON file
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 		return fmt.Errorf("error writing file: %w", err)
+	}
+
+	// For classic type, also generate Cowrie config files
+	if config.Type == "classic" {
+		if err := WriteCowrieConfig(profileDir, config); err != nil {
+			return fmt.Errorf("error writing cowrie.cfg: %w", err)
+		}
+		if err := WriteUserDB(profileDir, config); err != nil {
+			return fmt.Errorf("error writing userdb.txt: %w", err)
+		}
+		if err := WriteHoneyFS(profileDir, config); err != nil {
+			return fmt.Errorf("error writing honeyfs: %w", err)
+		}
+		if err := WriteDockerCompose(profileDir, config); err != nil {
+			return fmt.Errorf("error writing docker-compose.yml: %w", err)
+		}
 	}
 
 	return nil
@@ -64,14 +82,14 @@ func WriteConfigWithName(profileName string, config *models.Config) error {
 	}
 	config.Users = cleanedUsers
 
-	// Create config directory if it doesn't exist
-	configDir := getConfigDir()
-	if err := os.MkdirAll(configDir, 0755); err != nil {
-		return fmt.Errorf("error creating config directory: %w", err)
+	// Create profile directory (profiles/{profileName}/)
+	profileDir := getProfileDir(profileName)
+	if err := os.MkdirAll(profileDir, 0755); err != nil {
+		return fmt.Errorf("error creating profile directory: %w", err)
 	}
 
 	// Build filename with specified name
-	filename := filepath.Join(configDir, profileName+".json")
+	filename := filepath.Join(profileDir, profileName+".json")
 
 	// Encode configuration to JSON
 	data, err := json.MarshalIndent(config, "", "  ")
@@ -79,24 +97,48 @@ func WriteConfigWithName(profileName string, config *models.Config) error {
 		return fmt.Errorf("error encoding JSON: %w", err)
 	}
 
-	// Write file
+	// Write JSON file
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 		return fmt.Errorf("error writing file: %w", err)
+	}
+
+	// For classic type, also generate Cowrie config files
+	if config.Type == "classic" {
+		if err := WriteCowrieConfig(profileDir, config); err != nil {
+			return fmt.Errorf("error writing cowrie.cfg: %w", err)
+		}
+		if err := WriteUserDB(profileDir, config); err != nil {
+			return fmt.Errorf("error writing userdb.txt: %w", err)
+		}
+		if err := WriteHoneyFS(profileDir, config); err != nil {
+			return fmt.Errorf("error writing honeyfs: %w", err)
+		}
+		if err := WriteDockerCompose(profileDir, config); err != nil {
+			return fmt.Errorf("error writing docker-compose.yml: %w", err)
+		}
 	}
 
 	return nil
 }
 
-// ReadConfig reads a configuration from a JSON file
+// ReadConfig reads a configuration from a profile directory
 func ReadConfig(profileName string) (*models.Config, error) {
 	if profileName == "" {
 		profileName = "default"
 	}
 
-	filename := filepath.Join(getConfigDir(), profileName+".json")
+	// Try new structure first: profiles/{profileName}/{profileName}.json
+	profileDir := getProfileDir(profileName)
+	filename := filepath.Join(profileDir, profileName+".json")
 	data, err := os.ReadFile(filename)
+
+	// Fallback to old structure: profiles/{profileName}.json
 	if err != nil {
-		return nil, fmt.Errorf("error reading file: %w", err)
+		oldFilename := filepath.Join(getConfigDir(), profileName+".json")
+		data, err = os.ReadFile(oldFilename)
+		if err != nil {
+			return nil, fmt.Errorf("error reading file: %w", err)
+		}
 	}
 
 	var config models.Config
@@ -120,18 +162,52 @@ func ListConfigs() ([]string, error) {
 
 	var profiles []string
 	for _, entry := range entries {
+		// New structure: directories are profiles
+		if entry.IsDir() {
+			// Check if the profile JSON exists inside
+			jsonFile := filepath.Join(configDir, entry.Name(), entry.Name()+".json")
+			if _, err := os.Stat(jsonFile); err == nil {
+				profiles = append(profiles, entry.Name())
+			}
+		}
+		// Fallback: old structure with direct JSON files
 		if !entry.IsDir() && filepath.Ext(entry.Name()) == ".json" {
-			profiles = append(profiles, entry.Name()[:len(entry.Name())-5])
+			profileName := entry.Name()[:len(entry.Name())-5]
+			// Avoid duplicates if both structures exist
+			found := false
+			for _, p := range profiles {
+				if p == profileName {
+					found = true
+					break
+				}
+			}
+			if !found {
+				profiles = append(profiles, profileName)
+			}
 		}
 	}
 
 	return profiles, nil
 }
 
-// getConfigDir returns the config directory path
+// getConfigDir returns the config directory path (~/.otori/profiles)
 func getConfigDir() string {
-	// Create 'profiles' folder in current directory
-	return "profiles"
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		// Fallback to current directory if home not found
+		return "profiles"
+	}
+	return filepath.Join(homeDir, ".otori", "profiles")
+}
+
+// GetConfigDir exports the config directory path for use by other packages
+func GetConfigDir() string {
+	return getConfigDir()
+}
+
+// getProfileDir returns the profile directory path for a specific profile
+func getProfileDir(profileName string) string {
+	return filepath.Join(getConfigDir(), profileName)
 }
 
 // removeNullChars removes null and control characters
