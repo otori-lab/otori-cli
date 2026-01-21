@@ -225,8 +225,8 @@ func (m StatusModel) renderCard(hp Honeypot) string {
 func GetRunningHoneypots() []Honeypot {
 	var honeypots []Honeypot
 
-	// Run docker ps to get otori containers
-	cmd := exec.Command("docker", "ps", "-a", "--filter", "name=otori-", "--format", "{{.Names}}|{{.Status}}|{{.Ports}}")
+	// Run docker ps to get RUNNING otori containers only (no -a flag)
+	cmd := exec.Command("docker", "ps", "--filter", "name=otori-", "--format", "{{.Names}}|{{.Status}}|{{.Ports}}")
 	output, err := cmd.Output()
 	if err != nil {
 		return honeypots

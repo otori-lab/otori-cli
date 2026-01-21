@@ -140,100 +140,179 @@ func WriteDockerCompose(profileDir string, config *models.Config) error {
 	return nil
 }
 
-// PasswdTemplate contains the base system users for honeyfs /etc/passwd
-const PasswdTemplate = `root:x:0:0:root:/root:/bin/bash
-daemon:x:1:1:daemon:/usr/sbin:/bin/sh
-bin:x:2:2:bin:/bin:/bin/sh
-sys:x:3:3:sys:/dev:/bin/sh
-sync:x:4:65534:sync:/bin:/bin/sync
-games:x:5:60:games:/usr/games:/bin/sh
-man:x:6:12:man:/var/cache/man:/bin/sh
-lp:x:7:7:lp:/var/spool/lpd:/bin/sh
-mail:x:8:8:mail:/var/mail:/bin/sh
-news:x:9:9:news:/var/spool/news:/bin/sh
-uucp:x:10:10:uucp:/var/spool/uucp:/bin/sh
-proxy:x:13:13:proxy:/bin:/bin/sh
-www-data:x:33:33:www-data:/var/www:/bin/sh
-backup:x:34:34:backup:/var/backups:/bin/sh
-list:x:38:38:Mailing List Manager:/var/list:/bin/sh
-irc:x:39:39:ircd:/var/run/ircd:/bin/sh
-gnats:x:41:41:Gnats Bug-Reporting System (admin):/var/lib/gnats:/bin/sh
-nobody:x:65534:65534:nobody:/nonexistent:/bin/sh
-libuuid:x:100:101::/var/lib/libuuid:/bin/sh
-sshd:x:101:65534::/var/run/sshd:/usr/sbin/nologin
-`
+// GetOtoriDir returns the otori config directory (~/.otori)
+func GetOtoriDir() string {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return ".otori"
+	}
+	return filepath.Join(homeDir, ".otori")
+}
 
-// ShadowTemplate contains the base system users for honeyfs /etc/shadow
-const ShadowTemplate = `root:$6$random$hash.placeholder.for.honeypot.root.user:15800:0:99999:7:::
-daemon:*:15800:0:99999:7:::
-bin:*:15800:0:99999:7:::
-sys:*:15800:0:99999:7:::
-sync:*:15800:0:99999:7:::
-games:*:15800:0:99999:7:::
-man:*:15800:0:99999:7:::
-lp:*:15800:0:99999:7:::
-mail:*:15800:0:99999:7:::
-news:*:15800:0:99999:7:::
-uucp:*:15800:0:99999:7:::
-proxy:*:15800:0:99999:7:::
-www-data:*:15800:0:99999:7:::
-backup:*:15800:0:99999:7:::
-list:*:15800:0:99999:7:::
-irc:*:15800:0:99999:7:::
-gnats:*:15800:0:99999:7:::
-nobody:*:15800:0:99999:7:::
-libuuid:!:15800:0:99999:7:::
-sshd:*:15800:0:99999:7:::
-`
+// GetBaseHoneyFSDir returns the base honeyfs directory (~/.otori/cowrie-honeyfs-base)
+func GetBaseHoneyFSDir() string {
+	return filepath.Join(GetOtoriDir(), "cowrie-honeyfs-base")
+}
 
-// WriteHoneyFS generates the honeyfs directory structure with passwd and shadow
+// WriteHoneyFS copies the base honeyfs and adds custom users
 func WriteHoneyFS(profileDir string, config *models.Config) error {
-	// Create honeyfs/etc directory
-	etcDir := filepath.Join(profileDir, "honeyfs", "etc")
-	if err := os.MkdirAll(etcDir, 0755); err != nil {
-		return fmt.Errorf("error creating honeyfs/etc directory: %w", err)
+	honeyfsDir := filepath.Join(profileDir, "honeyfs")
+	baseHoneyFS := GetBaseHoneyFSDir()
+
+	// Check if base honeyfs exists
+	if _, err := os.Stat(baseHoneyFS); os.IsNotExist(err) {
+		return fmt.Errorf("base honeyfs not found at %s (run 'make install' first)", baseHoneyFS)
 	}
 
-	// Generate passwd content
-	var passwdContent strings.Builder
-	passwdContent.WriteString(PasswdTemplate)
+	// Copy base honeyfs to profile
+	if err := copyDir(baseHoneyFS, honeyfsDir); err != nil {
+		return fmt.Errorf("error copying base honeyfs: %w", err)
+	}
 
-	// Add custom users from config (starting UID from 1000)
-	uid := 1000
+	// Add custom users to passwd and shadow
 	users := config.Users
 	if len(users) == 0 {
 		users = []string{"root", "admin"}
 	}
-	for _, user := range users {
-		if user != "root" { // root already in template
-			passwdContent.WriteString(fmt.Sprintf("%s:x:%d:%d:%s:/home/%s:/bin/bash\n",
-				user, uid, uid, strings.Title(user), user))
-			uid++
-		}
+
+	// Append custom users to passwd
+	passwdPath := filepath.Join(honeyfsDir, "etc", "passwd")
+	if err := appendUsersToPasswd(passwdPath, users); err != nil {
+		return fmt.Errorf("error updating passwd: %w", err)
 	}
 
-	// Write passwd
-	passwdPath := filepath.Join(etcDir, "passwd")
-	if err := os.WriteFile(passwdPath, []byte(passwdContent.String()), 0644); err != nil {
-		return fmt.Errorf("error writing honeyfs passwd: %w", err)
+	// Append custom users to shadow
+	shadowPath := filepath.Join(honeyfsDir, "etc", "shadow")
+	if err := appendUsersToShadow(shadowPath, users); err != nil {
+		return fmt.Errorf("error updating shadow: %w", err)
 	}
 
-	// Generate shadow content
-	var shadowContent strings.Builder
-	shadowContent.WriteString(ShadowTemplate)
-
-	// Add custom users to shadow (no password - auth handled by userdb.txt)
-	for _, user := range users {
-		if user != "root" { // root already in template
-			shadowContent.WriteString(fmt.Sprintf("%s:*:15800:0:99999:7:::\n", user))
-		}
+	// Append custom users to group
+	groupPath := filepath.Join(honeyfsDir, "etc", "group")
+	if err := appendUsersToGroup(groupPath, users); err != nil {
+		return fmt.Errorf("error updating group: %w", err)
 	}
 
-	// Write shadow
-	shadowPath := filepath.Join(etcDir, "shadow")
-	if err := os.WriteFile(shadowPath, []byte(shadowContent.String()), 0644); err != nil {
-		return fmt.Errorf("error writing honeyfs shadow: %w", err)
+	// Update hostname
+	hostnamePath := filepath.Join(honeyfsDir, "etc", "hostname")
+	hostname := config.ServerName
+	if hostname == "" {
+		hostname = "svr04"
+	}
+	if err := os.WriteFile(hostnamePath, []byte(hostname+"\n"), 0644); err != nil {
+		return fmt.Errorf("error updating hostname: %w", err)
+	}
+
+	// Create custom bait file
+	shareDir := filepath.Join(honeyfsDir, "etc", "share")
+	if err := os.MkdirAll(shareDir, 0755); err != nil {
+		return fmt.Errorf("error creating share directory: %w", err)
+	}
+	secretContent := `# Confidential - Do Not Share
+DB_HOST=192.168.1.100
+DB_USER=admin
+DB_PASS=SuperSecret123!
+`
+	if err := os.WriteFile(filepath.Join(shareDir, "secret.txt"), []byte(secretContent), 0644); err != nil {
+		return fmt.Errorf("error writing secret.txt: %w", err)
 	}
 
 	return nil
+}
+
+// copyDir recursively copies a directory
+func copyDir(src, dst string) error {
+	return filepath.Walk(src, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+
+		// Get relative path
+		relPath, err := filepath.Rel(src, path)
+		if err != nil {
+			return err
+		}
+		dstPath := filepath.Join(dst, relPath)
+
+		if info.IsDir() {
+			return os.MkdirAll(dstPath, info.Mode())
+		}
+
+		// Copy file
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		return os.WriteFile(dstPath, data, info.Mode())
+	})
+}
+
+// appendUsersToPasswd adds custom users to passwd file
+func appendUsersToPasswd(path string, users []string) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	uid := 1000
+	for _, user := range users {
+		if user != "root" {
+			line := fmt.Sprintf("%s:x:%d:%d:%s:/home/%s:/bin/bash\n",
+				user, uid, uid, capitalize(user), user)
+			if _, err := f.WriteString(line); err != nil {
+				return err
+			}
+			uid++
+		}
+	}
+	return nil
+}
+
+// appendUsersToShadow adds custom users to shadow file
+func appendUsersToShadow(path string, users []string) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	for _, user := range users {
+		if user != "root" {
+			line := fmt.Sprintf("%s:*:15800:0:99999:7:::\n", user)
+			if _, err := f.WriteString(line); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+// appendUsersToGroup adds custom user groups to group file
+func appendUsersToGroup(path string, users []string) error {
+	f, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	gid := 1000
+	for _, user := range users {
+		if user != "root" {
+			line := fmt.Sprintf("%s:x:%d:\n", user, gid)
+			if _, err := f.WriteString(line); err != nil {
+				return err
+			}
+			gid++
+		}
+	}
+	return nil
+}
+
+// capitalize returns the string with first letter capitalized
+func capitalize(s string) string {
+	if s == "" {
+		return s
+	}
+	return strings.ToUpper(s[:1]) + s[1:]
 }

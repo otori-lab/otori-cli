@@ -3,6 +3,7 @@ package commands
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"text/tabwriter"
 
@@ -156,6 +157,18 @@ func DeleteCommand(profileName string) error {
 		fmt.Println("Deletion cancelled")
 		return nil
 	}
+
+	// Stop and remove Docker container if it exists
+	containerName := "otori-" + profileName
+	fmt.Printf("Removing container '%s'...\n", containerName)
+
+	// Stop container (ignore errors if not running)
+	stopCmd := exec.Command("docker", "stop", containerName)
+	stopCmd.Run()
+
+	// Remove container (ignore errors if doesn't exist)
+	rmCmd := exec.Command("docker", "rm", containerName)
+	rmCmd.Run()
 
 	// Find profile (new structure: directory, old structure: file)
 	configDir := config.GetConfigDir()
