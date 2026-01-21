@@ -1,106 +1,77 @@
 # Otori CLI
 
-Otori CLI est un outil en ligne de commande permettant de déployer et d’expérimenter des honeypots locaux à des fins pédagogiques, expérimentales et de recherche en cybersécurité.
+Outil CLI pour déployer des honeypots Cowrie locaux. Projet de Fin d'Études (PFE) - ECE Paris.
 
-Projet développé dans le cadre d’un Projet de Fin d’Études (PFE). L’outil est conçu pour être léger, local et open source.
+## Installation
 
----
+```bash
+git clone https://github.com/otori-lab/otori-cli.git
+cd otori-cli
+make build
+```
+
+Le binaire est généré dans `bin/otori`.
+
+## Utilisation rapide
+
+```bash
+# Créer un profil
+./bin/otori init -t classic -p mon-honeypot -s srv-prod-01 -u root,admin
+
+# Déployer le honeypot
+./bin/otori deploy -p mon-honeypot
+
+# Vérifier le statut
+./bin/otori status
+
+# Arrêter
+./bin/otori stop -p mon-honeypot
+```
 
 ## Commandes
 
-```bash
-otori init
-otori deploy
-otori status
-otori stop
-````
+| Commande | Description |
+|----------|-------------|
+| `init` | Crée un profil de honeypot |
+| `deploy` | Déploie le honeypot via Docker |
+| `status` | Affiche l'état des honeypots |
+| `stop` | Arrête un honeypot |
+| `profiles list` | Liste les profils |
+| `profiles show` | Affiche les détails d'un profil |
+| `profiles delete` | Supprime un profil |
 
----
+Voir [internal/commands/README.md](internal/commands/README.md) pour la documentation détaillée.
 
-## otori init
+## Architecture
 
-Initialise un profil de honeypot.
-
-### Mode interactif
-
-```bash
-otori init
+```
+~/.otori/profiles/{profile}/
+├── {profile}.json      # Configuration du profil
+├── cowrie.cfg          # Config Cowrie
+├── userdb.txt          # Utilisateurs autorisés
+├── docker-compose.yml  # Compose pour déploiement
+└── honeyfs/            # Filesystem simulé
+    ├── etc/
+    ├── proc/
+    └── ...
 ```
 
-### Mode non interactif
+## Personnalisation du honeyfs
+
+Après `init`, vous pouvez ajouter des fichiers dans le dossier `honeyfs/` du profil. Ils seront automatiquement ajoutés au filesystem du honeypot lors du `deploy`.
 
 ```bash
-otori init \
-  --type [classic|ia] \
-  --profile-name [profile_name] \
-  --server-name [server_name] \
-  --company [company_name] \
-  --users root,admin,test
+# Exemple : ajouter un fichier bait
+echo "DB_PASS=secret123" > ~/.otori/profiles/mon-honeypot/honeyfs/var/www/.env
+
+# Le fichier sera visible dans le honeypot après deploy
+./bin/otori deploy -p mon-honeypot
 ```
 
-### Flags
+## Prérequis
 
-* --type *(obligatoire)* : type de honeypot
-* --profile-name *(optionnel)* : nom du profil (défaut : default)
-* --server-name *(obligatoire)* : nom du serveur simulé
-* --company *(optionnel)* : organisation simulée
-* --users *(optionnel)* : utilisateurs fictifs
-
----
-
-## otori deploy
-
-Déploie un honeypot à partir d’un profil.
-
-```bash
-otori deploy
-otori deploy --profile srv04
-```
-
-### Flags
-
-* --profile : profil à utiliser
-* --force : force le redéploiement
-
----
-
-## otori status
-
-Affiche l’état du honeypot local.
-
-```bash
-otori status
-otori status --profile srv04
-otori status --json
-```
-
-### Flags
-
-* --profile : statut d’un profil spécifique
-* --json : sortie JSON
-
----
-
-## otori stop
-
-Arrête le honeypot en cours.
-
-```bash
-otori stop
-otori stop --force
-```
-
-### Flags
-
-* --force : force l’arrêt
-
----
-
-## Statut
-
-Projet en cours de développement.
-
----
+- Go 1.21+
+- Docker & Docker Compose
 
 ## Licence
 
