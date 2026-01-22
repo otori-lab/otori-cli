@@ -25,12 +25,12 @@ var initCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		if cmd.Flags().NFlag() == 0 {
-			// Interactive mode with TUI Bubble Tea
+			// Interactive mode with TUI Bubble Tea (logo is displayed by the TUI)
 			runInteractiveInit()
 			return
 		}
 
-		// Display logo
+		// Display logo (non-interactive mode only)
 		fmt.Println(ui.GetLogo())
 
 		// Non-interactive mode: validate required fields

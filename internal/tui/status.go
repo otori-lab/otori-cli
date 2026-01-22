@@ -2,6 +2,7 @@ package tui
 
 import (
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -220,34 +221,62 @@ func (m StatusModel) renderCard(hp Honeypot) string {
 	return cardStyle.Render(content.String())
 }
 
-// GetMockHoneypots returns mock honeypot data for testing
-func GetMockHoneypots() []Honeypot {
-	return []Honeypot{
-		{
-			Name:       "honeypot-prod-1",
-			Profile:    "production",
-			Type:       "classic",
-			Status:     StatusActive,
-			Uptime:     "2d 14h 32m",
-			ServerName: "ssh-server-01",
-			Port:       2222,
-		},
-		{
-			Name:       "honeypot-dev-1",
-			Profile:    "development",
-			Type:       "ia",
-			Status:     StatusStopped,
-			ServerName: "test-server",
-			Port:       2223,
-		},
-		{
-			Name:       "honeypot-staging",
-			Profile:    "staging",
-			Type:       "classic",
-			Status:     StatusError,
-			LastError:  "Connection timeout",
-			ServerName: "staging-srv",
-			Port:       2224,
-		},
+// GetRunningHoneypots returns real honeypot data from Docker containers
+func GetRunningHoneypots() []Honeypot {
+	var honeypots []Honeypot
+
+	// Run docker ps to get RUNNING otori containers only (no -a flag)
+	cmd := exec.Command("docker", "ps", "--filter", "name=otori-", "--format", "{{.Names}}|{{.Status}}|{{.Ports}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return honeypots
 	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		parts := strings.Split(line, "|")
+		if len(parts) < 2 {
+			continue
+		}
+
+		containerName := parts[0]
+		statusStr := parts[1]
+
+		// Extract profile name from container name (otori-{profile})
+		profileName := strings.TrimPrefix(containerName, "otori-")
+
+		// Determine status
+		var status HoneypotStatus
+		var uptime string
+		if strings.Contains(statusStr, "Up") {
+			status = StatusActive
+			// Extract uptime from status string (e.g., "Up 2 hours")
+			uptime = strings.TrimPrefix(statusStr, "Up ")
+		} else if strings.Contains(statusStr, "Exited") {
+			status = StatusStopped
+		} else {
+			status = StatusError
+		}
+
+		// Get port (default 2222)
+		port := 2222
+
+		honeypot := Honeypot{
+			Name:       containerName,
+			Profile:    profileName,
+			Type:       "classic",
+			Status:     status,
+			Uptime:     uptime,
+			ServerName: profileName,
+			Port:       port,
+		}
+
+		honeypots = append(honeypots, honeypot)
+	}
+
+	return honeypots
 }
