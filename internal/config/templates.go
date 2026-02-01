@@ -230,7 +230,7 @@ API_KEY=sk-prod-xxxxxxxxxxxx
 	return nil
 }
 
-// CustomizeIAProfile customizes the IA honeypot profile (dynamic port, container name)
+// CustomizeIAProfile customizes the IA honeypot profile (dynamic port, container name, users, context)
 func CustomizeIAProfile(profileDir string, config *models.Config) error {
 	sshPort, _ := GetPortsForProfile(config.ProfileName)
 
@@ -246,21 +246,49 @@ func CustomizeIAProfile(profileDir string, config *models.Config) error {
 		"2222:2222",
 		fmt.Sprintf("%d:2222", sshPort), 1)
 
-	// Replace container name (try all possible patterns)
-	newContent = strings.Replace(newContent,
-		"container_name: ssh-honeypot",
-		fmt.Sprintf("container_name: otori-%s", config.ProfileName), 1)
+	// Replace honeypot container name
 	newContent = strings.Replace(newContent,
 		"container_name: otori-ia",
 		fmt.Sprintf("container_name: otori-%s", config.ProfileName), 1)
+
+	// Replace ollama container name to avoid conflicts
 	newContent = strings.Replace(newContent,
-		"container_name: honeypot-ia",
-		fmt.Sprintf("container_name: otori-%s", config.ProfileName), 1)
+		"container_name: ollama",
+		fmt.Sprintf("container_name: ollama-%s", config.ProfileName), 1)
+
+	// Update ollama volume name
+	newContent = strings.Replace(newContent,
+		"ollama_data:",
+		fmt.Sprintf("ollama-%s-data:", config.ProfileName), 1)
+	newContent = strings.Replace(newContent,
+		"- ollama_data:",
+		fmt.Sprintf("- ollama-%s-data:", config.ProfileName), 1)
 
 	// Replace hostname in environment
 	newContent = strings.Replace(newContent,
 		`FAKE_HOSTNAME: "honeypot"`,
 		fmt.Sprintf(`FAKE_HOSTNAME: "%s"`, config.ServerName), 1)
+
+	// Replace user if provided in config
+	if len(config.Users) > 0 {
+		newContent = strings.Replace(newContent,
+			`FAKE_USER: "admin"`,
+			fmt.Sprintf(`FAKE_USER: "%s"`, config.Users[0]), 1)
+	}
+
+	// Add EXTRA_CONTEXT if company is provided
+	if config.Company != "" {
+		extraContext := fmt.Sprintf("This server belongs to %s.", config.Company)
+		newContent = strings.Replace(newContent,
+			`# EXTRA_CONTEXT: ""`,
+			fmt.Sprintf(`EXTRA_CONTEXT: "%s"`, extraContext), 1)
+	}
+
+	// Create logs directory
+	logsDir := filepath.Join(profileDir, "logs")
+	if err := os.MkdirAll(logsDir, 0755); err != nil {
+		return fmt.Errorf("error creating logs directory: %w", err)
+	}
 
 	return os.WriteFile(composePath, []byte(newContent), 0644)
 }

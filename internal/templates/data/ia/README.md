@@ -1,24 +1,29 @@
-# SSH Honeypot
+# LLM SSH Honeypot
 
-Instructions pour exécuter le honeypot SSH sur Windows (PowerShell)
+Honeypot SSH avec reponses generees par IA (Ollama).
 
-Prérequis
-- Python 3.9+
-- (Optionnel) Ollama local si vous souhaitez les réponses LLM (voir `OLLAMA_URL` dans `honeypot_ssh.py`).
+## Demarrage
 
-Étapes (PowerShell)
-
-```powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python honeypot_ssh.py
+```bash
+docker compose up -d
 ```
 
-Notes
-- Le serveur écoute sur le port 2222 (non privilégié). Connectez-vous avec : `ssh -p 2222 user@HOST` et le mot de passe `password`.
-- La clé d'hôte est `hostkey_rsa` (déjà présente) — le script la créera si elle manque.
-- Les logs sont écrits dans le dossier `logs/honeypot_sessions.jsonl`.
-- Si vous n'avez pas un service Ollama local sur `http://127.0.0.1:11434`, les commandes non reconnues retourneront une erreur générique (le honeypot fonctionne sans Ollama).
+Le modele Mistral sera telecharge automatiquement au premier usage.
 
-Pour une démo complète et exemples de commandes, voir `DEMO.md`.
+## Test
+
+```bash
+ssh -p PORT admin@localhost
+# Password: admin123
+```
+
+## Logs
+
+Les logs sont dans `./logs/honeypot_sessions.jsonl`
+
+## Configuration
+
+Modifiez les variables d'environnement dans `docker-compose.yml`:
+- `FAKE_USER` / `FAKE_PASS` : credentials acceptes
+- `FAKE_HOSTNAME` : hostname affiche
+- `EXTRA_CONTEXT` : contexte additionnel pour le LLM

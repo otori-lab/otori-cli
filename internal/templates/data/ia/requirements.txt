@@ -1,2 +1,0 @@
-paramiko>=2.11
-requests>=2.28
