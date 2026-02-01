@@ -187,9 +187,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cleaned := strings.TrimSpace(m.listInput)
 					cleaned = strings.Trim(cleaned, "\x00")
 					if cleaned != "" {
-						m.listUsers = append(m.listUsers, cleaned)
+						// Check if IA type - only allow 1 user
+						selectedType := m.fields[0].value // type is first field
+						if selectedType == "ia" && len(m.listUsers) >= 1 {
+							m.err = "IA honeypot only supports one user"
+							m.listInput = ""
+						} else {
+							m.listUsers = append(m.listUsers, cleaned)
+							m.listInput = ""
+						}
 					}
-					m.listInput = ""
 				} else {
 					// If empty, finish the list and move to next field
 					if m.currentField < len(m.fields)-1 {
@@ -355,14 +362,23 @@ func (m Model) View() string {
 
 			} else if field.fieldType == FieldTypeList {
 				// User list
+				selectedType := m.fields[0].value
 				if len(m.listUsers) > 0 {
 					for _, user := range m.listUsers {
 						sb.WriteString(completeStyle.Render("  ✓ " + user + "\n"))
 					}
 				}
-				// Current input
+				// Current input - show different placeholder for IA type
+				placeholder := field.placeholder
+				if selectedType == "ia" {
+					if len(m.listUsers) >= 1 {
+						placeholder = "max 1 user for IA (press Enter to continue)"
+					} else {
+						placeholder = "enter one user (IA supports only 1)"
+					}
+				}
 				if m.listInput == "" {
-					sb.WriteString(inputStyle.Render(placeholderStyle.Render("▌ " + field.placeholder)))
+					sb.WriteString(inputStyle.Render(placeholderStyle.Render("▌ " + placeholder)))
 				} else {
 					sb.WriteString(inputStyle.Render(m.listInput + "▌"))
 				}
