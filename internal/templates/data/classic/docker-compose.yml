@@ -1,0 +1,20 @@
+services:
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: otori-classic
+    restart: unless-stopped
+    ports:
+      - "2222:2222"   # SSH
+      - "2223:2223"   # Telnet
+    volumes:
+      - ./cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+      - ./honeyfs:/cowrie/cowrie-git/honeyfs:ro
+      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie
+      - cowrie-downloads:/cowrie/cowrie-git/var/lib/cowrie/downloads
+    environment:
+      - COWRIE_HOSTNAME=svr04
+
+volumes:
+  cowrie-logs:
+  cowrie-downloads:

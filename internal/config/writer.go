@@ -9,11 +9,12 @@ import (
 	"time"
 
 	"github.com/otori-lab/otori-cli/internal/models"
+	"github.com/otori-lab/otori-cli/internal/templates"
 )
 
 // WriteConfig writes the configuration to a profile directory
-// For "classic" type: creates profile folder with JSON + cowrie.cfg + userdb.txt
-// For "ia" type: creates profile folder with JSON only
+// For "classic" type: creates profile folder with JSON + cowrie.cfg + userdb.txt + honeyfs
+// For "ia" type: creates profile folder with JSON + IA honeypot files
 func WriteConfig(config *models.Config) error {
 	// Add timestamp
 	config.CreatedAt = time.Now().Format(time.RFC3339)
@@ -50,19 +51,31 @@ func WriteConfig(config *models.Config) error {
 		return fmt.Errorf("error writing file: %w", err)
 	}
 
-	// For classic type, also generate Cowrie config files
-	if config.Type == "classic" {
+	// Normalize type for template extraction
+	templateType := normalizeType(config.Type)
+
+	// Extract base templates from embedded files
+	if err := templates.Extract(templateType, profileDir); err != nil {
+		return fmt.Errorf("error extracting templates: %w", err)
+	}
+
+	// Customize based on type
+	if templateType == "classic" {
 		if err := WriteCowrieConfig(profileDir, config); err != nil {
 			return fmt.Errorf("error writing cowrie.cfg: %w", err)
 		}
 		if err := WriteUserDB(profileDir, config); err != nil {
 			return fmt.Errorf("error writing userdb.txt: %w", err)
 		}
-		if err := WriteHoneyFS(profileDir, config); err != nil {
-			return fmt.Errorf("error writing honeyfs: %w", err)
+		if err := CustomizeHoneyFS(profileDir, config); err != nil {
+			return fmt.Errorf("error customizing honeyfs: %w", err)
 		}
 		if err := WriteDockerCompose(profileDir, config); err != nil {
 			return fmt.Errorf("error writing docker-compose.yml: %w", err)
+		}
+	} else if templateType == "ia" {
+		if err := CustomizeIAProfile(profileDir, config); err != nil {
+			return fmt.Errorf("error customizing IA profile: %w", err)
 		}
 	}
 
@@ -102,19 +115,31 @@ func WriteConfigWithName(profileName string, config *models.Config) error {
 		return fmt.Errorf("error writing file: %w", err)
 	}
 
-	// For classic type, also generate Cowrie config files
-	if config.Type == "classic" {
+	// Normalize type for template extraction
+	templateType := normalizeType(config.Type)
+
+	// Extract base templates from embedded files
+	if err := templates.Extract(templateType, profileDir); err != nil {
+		return fmt.Errorf("error extracting templates: %w", err)
+	}
+
+	// Customize based on type
+	if templateType == "classic" {
 		if err := WriteCowrieConfig(profileDir, config); err != nil {
 			return fmt.Errorf("error writing cowrie.cfg: %w", err)
 		}
 		if err := WriteUserDB(profileDir, config); err != nil {
 			return fmt.Errorf("error writing userdb.txt: %w", err)
 		}
-		if err := WriteHoneyFS(profileDir, config); err != nil {
-			return fmt.Errorf("error writing honeyfs: %w", err)
+		if err := CustomizeHoneyFS(profileDir, config); err != nil {
+			return fmt.Errorf("error customizing honeyfs: %w", err)
 		}
 		if err := WriteDockerCompose(profileDir, config); err != nil {
 			return fmt.Errorf("error writing docker-compose.yml: %w", err)
+		}
+	} else if templateType == "ia" {
+		if err := CustomizeIAProfile(profileDir, config); err != nil {
+			return fmt.Errorf("error customizing IA profile: %w", err)
 		}
 	}
 
@@ -220,4 +245,16 @@ func removeNullChars(s string) string {
 		}
 	}
 	return strings.TrimSpace(result.String())
+}
+
+// normalizeType normalizes the honeypot type to "classic" or "ia"
+func normalizeType(t string) string {
+	switch strings.ToLower(t) {
+	case "classic", "classique":
+		return "classic"
+	case "ia", "ai", "intelligence artificielle":
+		return "ia"
+	default:
+		return t
+	}
 }

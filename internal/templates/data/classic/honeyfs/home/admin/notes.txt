@@ -1,0 +1,4 @@
+﻿TODO:
+- Renouveler le certificat SSL avant le 25/02
+- Vérifier pourquoi le backup a échoué hier
+- Mettre à jour la clé SSH de Fabrice

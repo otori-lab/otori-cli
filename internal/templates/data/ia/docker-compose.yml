@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  honeypot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        SSH_PORT: 2222
+    container_name: ssh-honeypot
+    ports:
+      - "2222:2222"
+    environment:
+      # LLM configuration (Ollama local or remote)
+      OLLAMA_URL: "http://127.0.0.1:11434/api/generate"
+      OLLAMA_MODEL: "mistral:latest"
+      # SSH server config
+      LISTEN_HOST: "0.0.0.0"
+      LISTEN_PORT: "2222"
+      FAKE_USER: "user"
+      FAKE_PASS: "password"
+      FAKE_HOSTNAME: "honeypot"
+    volumes:
+      # Persist logs and sessions across container restarts
+      - ./logs:/app/logs
+    restart: unless-stopped
+    networks:
+      - honeypot-net
+    # Optional: limit resources
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1'
+    #       memory: 512M
+
+  # Optional: Ollama service (if you want to run Ollama in a container too)
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   ports:
+  #     - "11434:11434"
+  #   environment:
+  #     OLLAMA_KEEP_ALIVE: "5m"
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   networks:
+  #     - honeypot-net
+
+networks:
+  honeypot-net:
+    driver: bridge
+
+# volumes:
+#   ollama_data:

@@ -1,0 +1,14 @@
+[honeypot]
+# Nom par défaut (sera changé par le CLI plus tard)
+hostname = srv-confidential
+
+# Message à l'accueil SSH
+log_path = var/log/cowrie
+
+[ssh]
+# On active le banner personnalisé
+banner_file = etc/issue
+
+[shell]
+# Important : permet de simuler le contenu des fichiers présents dans honeyfs
+# filesystem = share/cowrie/fs.pickle  --- on retire cette partie pcq elle ne fonctionne pas donc on laisse celle de cowrie par défaut, mais tout en conservant nos personnalisations 
