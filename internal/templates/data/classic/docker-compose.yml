@@ -16,7 +16,7 @@ services:
       - COWRIE_HOSTNAME=svr04
 
   shipper:
-    build: ./shipper
+    image: ghcr.io/otori-lab/otori-honeypots/cowrie-shipper:latest
     container_name: otori-classic-shipper
     restart: unless-stopped
     environment:
