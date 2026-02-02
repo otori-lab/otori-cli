@@ -18,6 +18,7 @@ var initProfileName string
 var initServerName string
 var initCompanyName string
 var initUsers []string
+var initMonitoringURL string
 
 var initCmd = &cobra.Command{
 	Use:   "init",
@@ -52,6 +53,7 @@ var initCmd = &cobra.Command{
 		cfg.ServerName = initServerName
 		cfg.Company = initCompanyName
 		cfg.Users = initUsers
+		cfg.MonitoringURL = initMonitoringURL
 
 		// Set profile name (default if empty)
 		if initProfileName != "" {
@@ -187,6 +189,14 @@ func init() {
 		"u",
 		[]string{},
 		"Comma-separated list of fake users (e.g. root,admin,test)",
+	)
+
+	initCmd.Flags().StringVarP(
+		&initMonitoringURL,
+		"monitoring-url",
+		"m",
+		"",
+		"URL of the monitoring server (e.g. http://monitoring.local:8000)",
 	)
 
 	RootCmd.AddCommand(initCmd)

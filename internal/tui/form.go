@@ -64,6 +64,7 @@ func createModel(mode string, cfg *models.Config) Model {
 	serverValue := ""
 	profileValue := ""
 	companyValue := ""
+	monitoringValue := ""
 	var usersList []string
 	selectTypeIndex := 0
 
@@ -73,6 +74,7 @@ func createModel(mode string, cfg *models.Config) Model {
 		serverValue = cfg.ServerName
 		profileValue = cfg.ProfileName
 		companyValue = cfg.Company
+		monitoringValue = cfg.MonitoringURL
 		usersList = cfg.Users
 
 		// Find the selected type index (normalize to lowercase)
@@ -113,6 +115,13 @@ func createModel(mode string, cfg *models.Config) Model {
 				placeholder: "optional",
 				fieldType:   FieldTypeText,
 				value:       companyValue,
+			},
+			{
+				name:        "monitoringUrl",
+				label:       "Monitoring URL",
+				placeholder: "optional (e.g. http://monitoring.local:8000)",
+				fieldType:   FieldTypeText,
+				value:       monitoringValue,
 			},
 			{
 				name:        "users",
@@ -187,9 +196,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					cleaned := strings.TrimSpace(m.listInput)
 					cleaned = strings.Trim(cleaned, "\x00")
 					if cleaned != "" {
-						m.listUsers = append(m.listUsers, cleaned)
+						// Check if IA type - only allow 1 user
+						selectedType := m.fields[0].value // type is first field
+						if selectedType == "ia" && len(m.listUsers) >= 1 {
+							m.err = "IA honeypot only supports one user"
+							m.listInput = ""
+						} else {
+							m.listUsers = append(m.listUsers, cleaned)
+							m.listInput = ""
+						}
 					}
-					m.listInput = ""
 				} else {
 					// If empty, finish the list and move to next field
 					if m.currentField < len(m.fields)-1 {
@@ -355,14 +371,23 @@ func (m Model) View() string {
 
 			} else if field.fieldType == FieldTypeList {
 				// User list
+				selectedType := m.fields[0].value
 				if len(m.listUsers) > 0 {
 					for _, user := range m.listUsers {
 						sb.WriteString(completeStyle.Render("  ✓ " + user + "\n"))
 					}
 				}
-				// Current input
+				// Current input - show different placeholder for IA type
+				placeholder := field.placeholder
+				if selectedType == "ia" {
+					if len(m.listUsers) >= 1 {
+						placeholder = "max 1 user for IA (press Enter to continue)"
+					} else {
+						placeholder = "enter one user (IA supports only 1)"
+					}
+				}
 				if m.listInput == "" {
-					sb.WriteString(inputStyle.Render(placeholderStyle.Render("▌ " + field.placeholder)))
+					sb.WriteString(inputStyle.Render(placeholderStyle.Render("▌ " + placeholder)))
 				} else {
 					sb.WriteString(inputStyle.Render(m.listInput + "▌"))
 				}
@@ -496,6 +521,8 @@ func (m Model) GetConfig() *models.Config {
 			}
 		case "company":
 			cfg.Company = field.value
+		case "monitoringUrl":
+			cfg.MonitoringURL = field.value
 		case "users":
 			// Clean and add users (without null or empty characters)
 			for _, user := range m.listUsers {

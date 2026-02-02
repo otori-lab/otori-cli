@@ -71,6 +71,14 @@ func ValidateConfig(config *models.Config) []ValidationError {
 		}
 	}
 
+	// IA type only supports one user
+	if config.Type == "ia" && len(config.Users) > 1 {
+		errors = append(errors, ValidationError{
+			Field:   "Users",
+			Message: "IA honeypot only supports one user (LLM limitation)",
+		})
+	}
+
 	return errors
 }
 

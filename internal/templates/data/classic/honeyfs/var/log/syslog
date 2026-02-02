@@ -1,0 +1,3 @@
+﻿Jan 21 06:25:01 srv-prod-01 systemd[1]: Starting Daily apt upgrade and clean activities...
+Jan 21 06:25:05 srv-prod-01 systemd[1]: apt-daily-upgrade.service: Succeeded.
+Jan 21 06:25:05 srv-prod-01 systemd[1]: Finished Daily apt upgrade and clean activities.

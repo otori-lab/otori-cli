@@ -1,0 +1,37 @@
+services:
+  cowrie:
+    image: cowrie/cowrie:latest
+    container_name: otori-classic
+    restart: unless-stopped
+    ports:
+      - "2222:2222"   # SSH
+      - "2223:2223"   # Telnet
+    volumes:
+      - ./cowrie.cfg:/cowrie/cowrie-git/etc/cowrie.cfg:ro
+      - ./userdb.txt:/cowrie/cowrie-git/etc/userdb.txt:ro
+      - ./honeyfs:/cowrie/cowrie-git/honeyfs:ro
+      - cowrie-logs:/cowrie/cowrie-git/var/log/cowrie
+      - cowrie-downloads:/cowrie/cowrie-git/var/lib/cowrie/downloads
+    environment:
+      - COWRIE_HOSTNAME=svr04
+
+  shipper:
+    image: ghcr.io/otori-lab/otori-honeypots/cowrie-shipper:latest
+    container_name: otori-classic-shipper
+    restart: unless-stopped
+    environment:
+      MONITORING_URL: "${MONITORING_URL}"
+      PROFILE_NAME: "classic"
+      FAKE_HOSTNAME: "svr04"
+      LOG_FILE: /logs/cowrie.json
+      DATA_DIR: /data
+    volumes:
+      - cowrie-logs:/logs:ro
+      - shipper-data:/data
+    depends_on:
+      - cowrie
+
+volumes:
+  cowrie-logs:
+  cowrie-downloads:
+  shipper-data:
