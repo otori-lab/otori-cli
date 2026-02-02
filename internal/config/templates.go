@@ -129,6 +129,9 @@ services:
     volumes:
       - cowrie-logs:/logs:ro
       - shipper-data:/data
+    networks:
+      - default
+      - otori-network
     depends_on:
       - cowrie
 
@@ -139,6 +142,10 @@ volumes:
     name: otori-%s-downloads
   shipper-data:
     name: otori-%s-shipper-data
+
+networks:
+  otori-network:
+    external: true
 `
 
 // GetPortsForProfile generates deterministic ports based on profile name
@@ -277,6 +284,18 @@ func CustomizeClassicProfile(profileDir string, config *models.Config) error {
 	newContent = strings.Replace(newContent,
 		"container_name: otori-classic-shipper",
 		fmt.Sprintf("container_name: otori-%s-shipper", config.ProfileName), 1)
+
+	// Update MONITORING_URL if provided
+	if config.MonitoringURL != "" {
+		newContent = strings.Replace(newContent,
+			`MONITORING_URL: "${MONITORING_URL}"`,
+			fmt.Sprintf(`MONITORING_URL: "%s"`, config.MonitoringURL), 1)
+	} else {
+		// Set empty string if not provided (shipper will be inactive)
+		newContent = strings.Replace(newContent,
+			`MONITORING_URL: "${MONITORING_URL}"`,
+			`MONITORING_URL: ""`, 1)
+	}
 
 	return os.WriteFile(composePath, []byte(newContent), 0644)
 }
