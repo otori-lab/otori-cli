@@ -15,6 +15,23 @@ services:
     environment:
       - COWRIE_HOSTNAME=svr04
 
+  shipper:
+    build: ./shipper
+    container_name: otori-classic-shipper
+    restart: unless-stopped
+    environment:
+      MONITORING_URL: "${MONITORING_URL}"
+      PROFILE_NAME: "classic"
+      FAKE_HOSTNAME: "svr04"
+      LOG_FILE: /logs/cowrie.json
+      DATA_DIR: /data
+    volumes:
+      - cowrie-logs:/logs:ro
+      - shipper-data:/data
+    depends_on:
+      - cowrie
+
 volumes:
   cowrie-logs:
   cowrie-downloads:
+  shipper-data:

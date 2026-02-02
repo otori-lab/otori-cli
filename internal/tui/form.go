@@ -64,6 +64,7 @@ func createModel(mode string, cfg *models.Config) Model {
 	serverValue := ""
 	profileValue := ""
 	companyValue := ""
+	monitoringValue := ""
 	var usersList []string
 	selectTypeIndex := 0
 
@@ -73,6 +74,7 @@ func createModel(mode string, cfg *models.Config) Model {
 		serverValue = cfg.ServerName
 		profileValue = cfg.ProfileName
 		companyValue = cfg.Company
+		monitoringValue = cfg.MonitoringURL
 		usersList = cfg.Users
 
 		// Find the selected type index (normalize to lowercase)
@@ -113,6 +115,13 @@ func createModel(mode string, cfg *models.Config) Model {
 				placeholder: "optional",
 				fieldType:   FieldTypeText,
 				value:       companyValue,
+			},
+			{
+				name:        "monitoringUrl",
+				label:       "Monitoring URL",
+				placeholder: "optional (e.g. http://monitoring.local:8000)",
+				fieldType:   FieldTypeText,
+				value:       monitoringValue,
 			},
 			{
 				name:        "users",
@@ -512,6 +521,8 @@ func (m Model) GetConfig() *models.Config {
 			}
 		case "company":
 			cfg.Company = field.value
+		case "monitoringUrl":
+			cfg.MonitoringURL = field.value
 		case "users":
 			// Clean and add users (without null or empty characters)
 			for _, user := range m.listUsers {

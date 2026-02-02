@@ -73,6 +73,9 @@ func WriteConfig(config *models.Config) error {
 		if err := WriteDockerCompose(profileDir, config); err != nil {
 			return fmt.Errorf("error writing docker-compose.yml: %w", err)
 		}
+		if err := CustomizeClassicProfile(profileDir, config); err != nil {
+			return fmt.Errorf("error customizing classic profile: %w", err)
+		}
 	} else if templateType == "ia" {
 		if err := CustomizeIAProfile(profileDir, config); err != nil {
 			return fmt.Errorf("error customizing IA profile: %w", err)
@@ -136,6 +139,9 @@ func WriteConfigWithName(profileName string, config *models.Config) error {
 		}
 		if err := WriteDockerCompose(profileDir, config); err != nil {
 			return fmt.Errorf("error writing docker-compose.yml: %w", err)
+		}
+		if err := CustomizeClassicProfile(profileDir, config); err != nil {
+			return fmt.Errorf("error customizing classic profile: %w", err)
 		}
 	} else if templateType == "ia" {
 		if err := CustomizeIAProfile(profileDir, config); err != nil {

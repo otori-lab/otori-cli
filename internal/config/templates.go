@@ -116,11 +116,29 @@ services:
     environment:
       - COWRIE_HOSTNAME=%s
 
+  shipper:
+    build: ./shipper
+    container_name: otori-%s-shipper
+    restart: unless-stopped
+    environment:
+      MONITORING_URL: "${MONITORING_URL}"
+      PROFILE_NAME: "%s"
+      FAKE_HOSTNAME: "%s"
+      LOG_FILE: /logs/cowrie.json
+      DATA_DIR: /data
+    volumes:
+      - cowrie-logs:/logs:ro
+      - shipper-data:/data
+    depends_on:
+      - cowrie
+
 volumes:
   cowrie-logs:
     name: otori-%s-logs
   cowrie-downloads:
     name: otori-%s-downloads
+  shipper-data:
+    name: otori-%s-shipper-data
 `
 
 // GetPortsForProfile generates deterministic ports based on profile name
@@ -141,13 +159,17 @@ func WriteDockerCompose(profileDir string, config *models.Config) error {
 	sshPort, telnetPort := GetPortsForProfile(config.ProfileName)
 
 	content := fmt.Sprintf(DockerComposeTemplate,
-		config.ProfileName,
-		config.ProfileName,
-		sshPort,
-		telnetPort,
-		config.ServerName,
-		config.ProfileName,
-		config.ProfileName,
+		config.ProfileName,      // comment
+		config.ProfileName,      // cowrie container_name
+		sshPort,                 // SSH port
+		telnetPort,              // Telnet port
+		config.ServerName,       // COWRIE_HOSTNAME
+		config.ProfileName,      // shipper container_name
+		config.ProfileName,      // shipper PROFILE_NAME
+		config.ServerName,       // shipper FAKE_HOSTNAME
+		config.ProfileName,      // cowrie-logs volume name
+		config.ProfileName,      // cowrie-downloads volume name
+		config.ProfileName,      // shipper-data volume name
 	)
 
 	filename := filepath.Join(profileDir, "docker-compose.yml")
@@ -230,6 +252,35 @@ API_KEY=sk-prod-xxxxxxxxxxxx
 	return nil
 }
 
+// CustomizeClassicProfile customizes the classic Cowrie honeypot profile (shipper config, monitoring URL)
+func CustomizeClassicProfile(profileDir string, config *models.Config) error {
+	// Read docker-compose.yml extracted by templates
+	composePath := filepath.Join(profileDir, "docker-compose.yml")
+	content, err := os.ReadFile(composePath)
+	if err != nil {
+		return fmt.Errorf("error reading docker-compose.yml: %w", err)
+	}
+
+	newContent := string(content)
+
+	// Update shipper PROFILE_NAME
+	newContent = strings.Replace(newContent,
+		`PROFILE_NAME: "classic"`,
+		fmt.Sprintf(`PROFILE_NAME: "%s"`, config.ProfileName), 1)
+
+	// Update shipper FAKE_HOSTNAME
+	newContent = strings.Replace(newContent,
+		`FAKE_HOSTNAME: "svr04"`,
+		fmt.Sprintf(`FAKE_HOSTNAME: "%s"`, config.ServerName), 1)
+
+	// Update shipper container name
+	newContent = strings.Replace(newContent,
+		"container_name: otori-classic-shipper",
+		fmt.Sprintf("container_name: otori-%s-shipper", config.ProfileName), 1)
+
+	return os.WriteFile(composePath, []byte(newContent), 0644)
+}
+
 // CustomizeIAProfile customizes the IA honeypot profile (dynamic port, container name, users, context)
 func CustomizeIAProfile(profileDir string, config *models.Config) error {
 	sshPort, _ := GetPortsForProfile(config.ProfileName)
@@ -256,13 +307,21 @@ func CustomizeIAProfile(profileDir string, config *models.Config) error {
 		"container_name: ollama",
 		fmt.Sprintf("container_name: ollama-%s", config.ProfileName), 1)
 
-	// Update ollama volume name
+	// Update ollama volume name (both reference and definition)
+	newContent = strings.Replace(newContent,
+		"ollama_data:/root/.ollama",
+		fmt.Sprintf("ollama-%s-data:/root/.ollama", config.ProfileName), 1)
 	newContent = strings.Replace(newContent,
 		"ollama_data:",
 		fmt.Sprintf("ollama-%s-data:", config.ProfileName), 1)
+
+	// Update honeypot_data volume name (both reference and definition)
 	newContent = strings.Replace(newContent,
-		"- ollama_data:",
-		fmt.Sprintf("- ollama-%s-data:", config.ProfileName), 1)
+		"honeypot_data:/app/data",
+		fmt.Sprintf("honeypot-%s-data:/app/data", config.ProfileName), 1)
+	newContent = strings.Replace(newContent,
+		"honeypot_data:",
+		fmt.Sprintf("honeypot-%s-data:", config.ProfileName), 1)
 
 	// Replace hostname in environment
 	newContent = strings.Replace(newContent,
@@ -283,6 +342,18 @@ func CustomizeIAProfile(profileDir string, config *models.Config) error {
 			`# EXTRA_CONTEXT: ""`,
 			fmt.Sprintf(`EXTRA_CONTEXT: "%s"`, extraContext), 1)
 	}
+
+	// Add MONITORING_URL if provided
+	if config.MonitoringURL != "" {
+		newContent = strings.Replace(newContent,
+			`MONITORING_URL: ""`,
+			fmt.Sprintf(`MONITORING_URL: "%s"`, config.MonitoringURL), 1)
+	}
+
+	// Add PROFILE_NAME
+	newContent = strings.Replace(newContent,
+		`PROFILE_NAME: ""`,
+		fmt.Sprintf(`PROFILE_NAME: "%s"`, config.ProfileName), 1)
 
 	// Create logs directory
 	logsDir := filepath.Join(profileDir, "logs")
