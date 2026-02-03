@@ -20,6 +20,9 @@ services:
       - ./logs:/app/logs
       - honeypot_data:/app/data
     restart: unless-stopped
+    networks:
+      - default
+      - otori-network
     depends_on:
       ollama:
         condition: service_started
@@ -34,3 +37,7 @@ services:
 volumes:
   ollama_data:
   honeypot_data:
+
+networks:
+  otori-network:
+    external: true
