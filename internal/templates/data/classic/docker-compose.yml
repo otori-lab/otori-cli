@@ -16,7 +16,7 @@ services:
       - COWRIE_HOSTNAME=svr04
 
   shipper:
-    image: ghcr.io/otori-lab/otori-honeypots/cowrie-shipper:latest
+    build: ./shipper
     container_name: otori-classic-shipper
     restart: unless-stopped
     environment:
@@ -28,6 +28,9 @@ services:
     volumes:
       - cowrie-logs:/logs:ro
       - shipper-data:/data
+    networks:
+      - default
+      - otori-network
     depends_on:
       - cowrie
 
@@ -35,3 +38,7 @@ volumes:
   cowrie-logs:
   cowrie-downloads:
   shipper-data:
+
+networks:
+  otori-network:
+    external: true

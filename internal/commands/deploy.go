@@ -75,6 +75,9 @@ func runDeploy() error {
 	}
 	fmt.Println()
 
+	// Ensure otori-network exists for shipper connectivity
+	ensureOtoriNetwork()
+
 	// Build docker compose command based on type
 	var dockerCmd *exec.Cmd
 	if profileType == "ia" {
@@ -242,6 +245,21 @@ func generateFsctlCommands(honeyfsDir string) []string {
 	})
 
 	return commands
+}
+
+// ensureOtoriNetwork creates the otori-network if it doesn't exist
+// This network is used for communication between honeypot shippers and the monitoring server
+func ensureOtoriNetwork() {
+	// Check if network exists
+	checkCmd := exec.Command("docker", "network", "inspect", "otori-network")
+	if err := checkCmd.Run(); err != nil {
+		// Network doesn't exist, create it
+		createCmd := exec.Command("docker", "network", "create", "otori-network")
+		if err := createCmd.Run(); err != nil {
+			// Silently ignore if creation fails (might be race condition)
+			return
+		}
+	}
 }
 
 func init() {
